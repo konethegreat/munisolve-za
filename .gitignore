@@ -1,0 +1,211 @@
+# Dependency folders
+node_modules/
+
+# Environment variables (SECURITY - NEVER REMOVE THIS)
+.env
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Prisma generated files
+/prisma/generated-client
+
+# ==========================================
+# MuniSolve ZA - .gitignore
+# ==========================================
+# This file prevents sensitive and unnecessary files
+# from being committed to version control (Git)
+
+# ==========================================
+# ENVIRONMENT VARIABLES (CRITICAL SECURITY)
+# ==========================================
+# NEVER commit .env files - they contain secrets!
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
+
+# Environment variable backup files
+*.env.backup
+.env.*
+
+# ==========================================
+# NODE MODULES & DEPENDENCIES
+# ==========================================
+# Dependencies should be reinstalled via package.json
+# These folders can be HUGE (100k+ files)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Package lock files (keep only one type)
+# Uncomment the one you DON'T use:
+# package-lock.json  # If using Yarn
+# yarn.lock          # If using npm
+
+# ==========================================
+# BUILD & DISTRIBUTION FOLDERS
+# ==========================================
+# These are generated during build process
+dist/
+dist-ssr/
+build/
+*.local
+
+# ==========================================
+# DATABASE FILES
+# ==========================================
+# Local SQLite databases (if used for testing)
+*.db
+*.sqlite
+*.sqlite3
+
+# Prisma migration lock file (auto-generated)
+# Keep this commented if working in a team
+# prisma/migrations/.migrate-lock
+
+# PostgreSQL backup files
+*.sql
+*.dump
+
+# ==========================================
+# LOGS & DEBUGGING
+# ==========================================
+# Log files can contain sensitive information
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==========================================
+# OPERATING SYSTEM FILES
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ==========================================
+# IDE & EDITOR FILES
+# ==========================================
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.history/
+
+# JetBrains IDEs (WebStorm, IntelliJ)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# ==========================================
+# TESTING & COVERAGE
+# ==========================================
+coverage/
+*.coverage
+.nyc_output/
+.coverage/
+htmlcov/
+.pytest_cache/
+
+# ==========================================
+# TEMPORARY FILES
+# ==========================================
+tmp/
+temp/
+*.tmp
+*.temp
+*.cache
+
+# ==========================================
+# SECURITY & CERTIFICATES
+# ==========================================
+# SSL/TLS certificates (never commit these!)
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# SSH keys
+id_rsa
+id_rsa.pub
+*.ppk
+
+# ==========================================
+# DOCKER (if used later)
+# ==========================================
+docker-compose.override.yml
+.dockerignore
+
+# ==========================================
+# MISCELLANEOUS
+# ==========================================
+# Editor backup files
+*~
+*.bak
+*.orig
+
+# npm package files
+*.tgz
+
+# MacOS network storage
+.apdisk
+
+# ==========================================
+# PROJECT-SPECIFIC IGNORE
+# ==========================================
+# Upload folders (for user-uploaded files)
+/server/uploads/*
+!/server/uploads/.gitkeep
+
+# Generated documentation
+/docs/api/
+
+# Test fixtures
+/server/test/fixtures/*.local.*
+
+# ==========================================
+# KEEP THESE FILES (Explicitly NOT ignored)
+# ==========================================
+# !.gitkeep files should be kept
+!**/.gitkeep
+
+# README files are important
+!README.md
+!**/README.md
