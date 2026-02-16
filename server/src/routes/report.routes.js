@@ -1,72 +1,172 @@
 // ==========================================
-// REPORT ROUTES (Placeholder)
+// REPORT ROUTES
 // ==========================================
-// Defines report-related endpoints
-// This is a placeholder - full implementation coming next
+// Defines all report-related endpoints
 // Author: MuniSolve ZA Development Team
 
 const express = require('express');
 const router = express.Router();
 
+// Import controllers
+const {
+  createReport,
+  getAllReports,
+  getReportById,
+  updateReport,
+  deleteReport,
+} = require('../controllers/report.controller');
+
+// Import middleware
 const { authenticate } = require('../middleware/auth.middleware');
-const { authorize } = require('../middleware/authz.middleware');
+const {
+  validateReportCreation,
+  validateIdParam,
+  handleValidationErrors,
+} = require('../middleware/validation.middleware');
+const { reportCreationLimiter } = require('../middleware/rateLimit.middleware');
 
 // ==========================================
-// PLACEHOLDER ROUTES
+// ALL ROUTES REQUIRE AUTHENTICATION
 // ==========================================
-// These will be fully implemented after testing authentication
+// Apply authentication to all report routes
+router.use(authenticate);
 
-/**
- * @route   GET /api/reports
- * @desc    Get all reports (with filters)
- * @access  Private
- */
-router.get(
-  '/',
-  authenticate,
-  (req, res) => {
-    res.status(200).json({
-      success: true,
-      message: 'Reports endpoint - Coming soon',
-      data: [],
-      hint: 'Full report functionality will be implemented after authentication testing'
-    });
-  }
-);
+// ==========================================
+// REPORT ROUTES
+// ==========================================
 
 /**
  * @route   POST /api/reports
  * @desc    Create a new report
- * @access  Private (Citizens and Admins)
+ * @access  Private (any authenticated user)
+ * 
+ * Request body:
+ * {
+ *   "title": "Large pothole on Main Road",
+ *   "description": "Deep pothole causing damage to vehicles",
+ *   "category": "POTHOLE",
+ *   "municipality": "City of Johannesburg",
+ *   "address": "Corner of Main Road and Church Street"
+ * }
  */
 router.post(
   '/',
-  authenticate,
-  authorize(['CITIZEN', 'MUNICIPAL_ADMIN', 'SUPER_ADMIN']),
-  (req, res) => {
-    res.status(501).json({
-      success: false,
-      message: 'Report creation endpoint - Coming soon',
-      errorCode: 'NOT_IMPLEMENTED'
-    });
-  }
+  reportCreationLimiter,      // Rate limit: 10 reports per hour
+  validateReportCreation,      // Validate input
+  handleValidationErrors,      // Check validation results
+  createReport                 // Controller function
+);
+
+/**
+ * @route   GET /api/reports
+ * @desc    Get all reports for current user
+ * @access  Private
+ * 
+ * Query parameters (optional):
+ * - status: PENDING, IN_PROGRESS, RESOLVED
+ * - category: POTHOLE, WATER_LEAK, etc.
+ * - municipality: City name
+ * 
+ * Example: GET /api/reports?status=PENDING&category=POTHOLE
+ */
+router.get(
+  '/',
+  getAllReports
 );
 
 /**
  * @route   GET /api/reports/:id
  * @desc    Get single report by ID
- * @access  Private
+ * @access  Private (user can only view their own reports)
+ * 
+ * URL parameters:
+ * - id: Report ID (number)
+ * 
+ * Example: GET /api/reports/1
  */
 router.get(
   '/:id',
-  authenticate,
-  (req, res) => {
-    res.status(501).json({
-      success: false,
-      message: 'Get report endpoint - Coming soon',
-      errorCode: 'NOT_IMPLEMENTED'
-    });
-  }
+  validateIdParam,
+  handleValidationErrors,
+  getReportById
 );
 
+/**
+ * @route   PUT /api/reports/:id
+ * @desc    Update report
+ * @access  Private (user can only update their own reports)
+ * 
+ * Request body (all optional):
+ * {
+ *   "title": "Updated title",
+ *   "description": "Updated description",
+ *   "category": "WATER_LEAK",
+ *   "municipality": "City of Tshwane",
+ *   "address": "New address"
+ * }
+ */
+router.put(
+  '/:id',
+  validateIdParam,
+  handleValidationErrors,
+  updateReport
+);
+
+/**
+ * @route   DELETE /api/reports/:id
+ * @desc    Delete report
+ * @access  Private (user can only delete their own reports)
+ * 
+ * Example: DELETE /api/reports/1
+ */
+router.delete(
+  '/:id',
+  validateIdParam,
+  handleValidationErrors,
+  deleteReport
+);
+
+// Export the router
 module.exports = router;
+
+// ==========================================
+// TESTING THESE ROUTES
+// ==========================================
+/*
+
+Make sure you have a valid JWT token from login/register.
+
+1. CREATE REPORT:
+curl -X POST http://localhost:5000/api/reports \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "title": "Large pothole on Main Road",
+    "description": "Deep pothole causing damage to vehicles near intersection",
+    "category": "POTHOLE",
+    "municipality": "City of Johannesburg",
+    "address": "Corner of Main Road and Church Street"
+  }'
+
+2. GET ALL REPORTS:
+curl http://localhost:5000/api/reports \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+3. GET SINGLE REPORT:
+curl http://localhost:5000/api/reports/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+4. UPDATE REPORT:
+curl -X PUT http://localhost:5000/api/reports/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "title": "Updated: Massive pothole",
+    "description": "Situation has worsened"
+  }'
+
+5. DELETE REPORT:
+curl -X DELETE http://localhost:5000/api/reports/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+*/

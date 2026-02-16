@@ -1,46 +1,48 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import api from '../api/axios'
-import Navbar from '../components/Navbar'
-import Footer from '../components/Footer'
+// ==========================================
+// LOGIN PAGE (Updated with AuthContext)
+// ==========================================
+import { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 export default function Login() {
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+  
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Get the page they were trying to access (if redirected here)
+  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
-    setError('')
-  }
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    
     try {
-      const { data } = await api.post('/auth/login', {
-        email: form.email,
-        password: form.password,
-      })
-      // Backend returns { success, message, data: { user, token, expiresIn } }
-      const token = data?.data?.token ?? data?.token ?? data?.accessToken ?? data?.access_token
-      if (token) {
-        localStorage.setItem('token', token)
-      }
-      // Redirect to home or dashboard when ready
-      window.location.href = '/'
+      await login(form.email, form.password);
+      // Redirect to where they were going, or dashboard
+      navigate(from, { replace: true });
     } catch (err) {
       const msg =
         err.response?.data?.message ||
-        err.response?.data?.error ||
         err.message ||
-        'Login failed. Please check your email and password.'
-      setError(msg)
+        'Login failed. Please check your email and password.';
+      setError(msg);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -59,6 +61,7 @@ export default function Login() {
                   {error}
                 </p>
               )}
+              
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
                   Email
@@ -74,6 +77,7 @@ export default function Login() {
                   placeholder="you@example.com"
                 />
               </div>
+              
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
                   Password
@@ -89,6 +93,7 @@ export default function Login() {
                   placeholder="••••••••"
                 />
               </div>
+              
               <button
                 type="submit"
                 disabled={loading}
@@ -109,5 +114,5 @@ export default function Login() {
       </main>
       <Footer />
     </div>
-  )
+  );
 }
