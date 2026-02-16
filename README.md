@@ -385,12 +385,12 @@ curl http://localhost:5000/api/auth/me \
 ## 👨‍💻 Developer
 
 **Kone Tshivhinda**  
-Full-Stack Developer | Pretoria, South Africa
+Full-Stack Developer | Johannesburg, South Africa
 
-- 📧 Email: [your email]
-- 💼 LinkedIn: [your profile]
-- 🌐 Portfolio: [your website]
-- 📍 Location: Pretoria, Gauteng, ZA
+- 📧 Email: erictshivhinda@gmail.com
+- 💼 LinkedIn: [\[your profile\]](https://za.linkedin.com/in/kone-tshivhinda-32a760233)
+- 🌐 Portfolio: [\[your website\]](https://github.com/konethegreat)
+- 📍 Location: Johannesburg, Gauteng, ZA
 
 **Available for hire** - Open to full-time, contract, or freelance opportunities.
 
@@ -428,15 +428,15 @@ This is a proprietary project. However, if you're interested in collaborating or
 ## 📞 Contact & Support
 
 **For Employment Opportunities:**  
-📧 [your email]  
-💼 [LinkedIn profile]  
+📧 erictshivhinda@gmail.com 
+💼 [\[LinkedIn profile\]](https://za.linkedin.com/in/kone-tshivhinda-32a760233)  
 
 **For Licensing Inquiries:**  
-📧 [your email]  
+📧 erictshivhinda@gmail.com 
 📄 See LICENSE file for details
 
 **For Technical Questions:**  
-📧 [your email]  
+📧 erictshivhinda@gmail.com
 🐛 Open an issue (employers only)
 
 ---
