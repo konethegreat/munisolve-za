@@ -1,45 +1,47 @@
-// Database configuration: lightweight replacement for Prisma
-// This file exports a simple `query` wrapper using `pg` (node-postgres).
-// If you prefer a different driver or ORM, replace this module accordingly.
+// ==========================================
+// DATABASE CONFIGURATION - PRISMA
+// ==========================================
+// Centralized Prisma Client initialization
+// Author: MuniSolve ZA Development Team
+// Last Updated: February 2026
 
-const DEBUG = process.env.NODE_ENV === 'development';
+const { PrismaClient } = require('@prisma/client');
 
-let pool;
-try {
-  const { Pool } = require('pg');
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
-} catch (err) {
-  console.error('[DATABASE] `pg` module not installed. Install it or provide your own DB client.');
-  pool = null;
-}
+// Initialize Prisma Client
+const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development' 
+    ? ['query', 'error', 'warn']
+    : ['error'],
+  errorFormat: 'pretty',
+});
 
-if (pool && DEBUG) {
-  pool.on('connect', () => console.log('✅ Database pool connected'));
-  pool.on('error', (err) => console.error('❌ Database pool error:', err));
-}
-
+// Graceful shutdown handlers
 process.on('SIGINT', async () => {
-  if (pool) {
-    console.log('\n[DATABASE] Closing database connections...');
-    await pool.end();
-    console.log('[DATABASE] Database connections closed');
-  }
+  console.log('\n[DATABASE] Closing database connections...');
+  await prisma.$disconnect();
+  console.log('[DATABASE] Database connections closed');
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  if (pool) {
-    console.log('\n[DATABASE] Closing database connections...');
-    await pool.end();
-    console.log('[DATABASE] Database connections closed');
-  }
+  console.log('\n[DATABASE] Closing database connections...');
+  await prisma.$disconnect();
+  console.log('[DATABASE] Database connections closed');
   process.exit(0);
 });
 
-module.exports = {
-  query: async (text, params) => {
-    if (!pool) throw new Error('No database client available. Install `pg` or replace `db.config.js`.');
-    return pool.query(text, params);
-  },
-  pool,
-};
+// Test connection in development
+if (process.env.NODE_ENV === 'development') {
+  prisma.$connect()
+    .then(() => {
+      console.log('✅ Database connected successfully');
+    })
+    .catch((error) => {
+      console.error('❌ Database connection failed:', error.message);
+      console.error('💡 Make sure PostgreSQL is running and DATABASE_URL in .env is correct');
+      process.exit(1);
+    });
+}
+
+// Export Prisma Client
+module.exports = prisma;
