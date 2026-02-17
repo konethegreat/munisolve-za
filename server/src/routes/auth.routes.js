@@ -9,7 +9,8 @@ const {
   register,
   login,
   getCurrentUser,
-  logout
+  logout,
+  googleLogin
 } = require('../controllers/auth.controller');
 
 // Import middleware
@@ -35,6 +36,7 @@ router.post('/login',    authLimiter, validateLogin,        handleValidationErro
 // ==========================================
 router.get('/me',       authenticate, getCurrentUser);
 router.post('/logout',  authenticate, logout);
+router.post('/google', googleLogin);
 
 // ==========================================
 // FUTURE ROUTES (Placeholders)
@@ -62,5 +64,8 @@ router.post('/verify-email', (req, res) => {
     errorCode: 'NOT_IMPLEMENTED'
   });
 });
+
+
+
 
 module.exports = router;

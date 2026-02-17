@@ -7,9 +7,11 @@
 
 // Import required packages
 const bcrypt = require('bcryptjs'); // Password hashing
-const jwt = require('jsonwebtoken'); // JWT token generation
+
 
 // Import Prisma Client from centralized config
+const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library'); // For Google OAuth
 const prisma = require('../config/db.config');
 
 // ==========================================
@@ -88,7 +90,7 @@ const register = async (req, res) => {
     // Token contains user ID, email, and role
     const token = jwt.sign(
       {
-        userId: newUser.id,
+        userId: user.id,
         email: newUser.email,
         role: newUser.role
       },
@@ -289,6 +291,55 @@ const login = async (req, res) => {
   }
 };
 
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+
+const googleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    // 1. Verify the token with Google
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    const { email, given_name, family_name, sub: googleId } = payload;
+
+    // 2. Find or Create the user in your database
+    // We use 'upsert' so it updates existing users or creates new ones
+    let user = await prisma.user.upsert({
+      where: { email },
+      update: { googleId },
+      create: {
+        email,
+        firstName: given_name,
+        lastName: family_name || '',
+        googleId,
+        password: '', // No password needed for Google users
+        phone: 'N/A',  // Default value
+        role: 'CITIZEN'
+      },
+    });
+
+    // 3. Generate your App's JWT token (just like regular login)
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: { user, token }
+    });
+
+  } catch (error) {
+    console.error('Google Auth Error:', error);
+    res.status(401).json({ success: false, message: 'Invalid Google Token' });
+  }
+};
 // ==========================================
 // GET CURRENT USER
 // ==========================================
@@ -395,5 +446,6 @@ module.exports = {
   register,
   login,
   getCurrentUser,
-  logout
+  logout,
+  googleLogin
 };

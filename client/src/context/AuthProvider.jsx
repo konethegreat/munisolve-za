@@ -112,6 +112,25 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const googleLogin = async (idToken) => {
+  try {
+    // Send the Google Token to your backend
+    const { data } = await api.post('/auth/google', { idToken });
+
+    if (data.success) {
+      const newToken = data.data.token;
+      const userData = data.data.user;
+
+      setToken(newToken);
+      setUser(userData);
+      localStorage.setItem('token', newToken);
+      return { success: true };
+    }
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Google authentication failed');
+  }
+};
+
   // Check if user is authenticated
   const isAuthenticated = !!token && !!user;
 
@@ -123,6 +142,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    googleLogin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

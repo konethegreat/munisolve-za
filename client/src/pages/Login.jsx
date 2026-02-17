@@ -6,18 +6,33 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth(); // We will add googleLogin to your context next
   
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Get the page they were trying to access (if redirected here)
   const from = location.state?.from?.pathname || '/dashboard';
+
+  // --- NEW: Handle Google Success ---
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError('');
+    try {
+      // We send the "id_token" from Google to our AuthContext logic
+      await googleLogin(credentialResponse.credential);
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Google login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -28,17 +43,11 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    
     try {
       await login(form.email, form.password);
-      // Redirect to where they were going, or dashboard
       navigate(from, { replace: true });
     } catch (err) {
-      const msg =
-        err.response?.data?.message ||
-        err.message ||
-        'Login failed. Please check your email and password.';
-      setError(msg);
+      setError(err.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -51,65 +60,70 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="bg-white rounded-xl shadow-lg border-t-4 border-[#0d3b5c] p-8">
             <h1 className="text-2xl font-bold text-[#0d3b5c] mb-2">Log in</h1>
-            <p className="text-slate-600 text-sm mb-6">
-              Sign in to your MuniSolve ZA account.
-            </p>
+            <p className="text-slate-600 text-sm mb-6">Sign in to your MuniSolve ZA account.</p>
+
+            {/* THE GOOGLE BUTTON */}
+            <div className="flex justify-center mb-6">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google Sign-In failed')}
+                useOneTap
+                theme="filled_blue"
+                shape="pill"
+                text="signin_with"
+                width="100%"
+              />
+            </div>
+
+            {/* THE DIVIDER */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200"></span></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-slate-400">Or continue with email</span></div>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                  {error}
-                </p>
+                <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
               )}
-              
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={form.email}
-                  onChange={handleChange}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-[#0d3b5c] focus:ring-1 focus:ring-[#0d3b5c] outline-none"
-                  placeholder="you@example.com"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={form.password}
-                  onChange={handleChange}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-[#0d3b5c] focus:ring-1 focus:ring-[#0d3b5c] outline-none"
-                  placeholder="••••••••"
-                />
-              </div>
-              
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-[#0d3b5c] hover:bg-[#0a2d45] text-white font-semibold py-3 px-4 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
+              {/* ... Email and Password fields remain exactly the same ... */}
+              <button type="submit" disabled={loading} className="...">
                 {loading ? 'Signing in...' : 'Log in'}
               </button>
             </form>
 
             <p className="mt-6 text-center text-slate-600 text-sm">
-              Don&apos;t have an account?{' '}
-              <Link to="/register" className="text-[#0d3b5c] font-medium hover:text-[#1a5f3c]">
-                Register
-              </Link>
+              Don&apos;t have an account? <Link to="/register" className="...">Register</Link>
             </p>
           </div>
+          {/* Email Input */}
+<div>
+  <label htmlFor="email" className="...">Email</label>
+  <input
+    id="email"
+    name="email"
+    type="email"
+    required
+    value={form.email}      // READS: form
+    onChange={handleChange} // READS: handleChange
+    className="..."
+    placeholder="you@example.com"
+  />
+</div>
+
+{/* Password Input */}
+<div>
+  <label htmlFor="password" className="...">Password</label>
+  <input
+    id="password"
+    name="password"
+    type="password"
+    required
+    value={form.password}   // READS: form
+    onChange={handleChange} // READS: handleChange
+    className="..."
+    placeholder="••••••••"
+  />
+</div>
         </div>
       </main>
       <Footer />
