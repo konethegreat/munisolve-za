@@ -1,25 +1,18 @@
 // ==========================================
-// UPDATED REPORT CARD with Siyanda Chat
+// REPORT CARD (with View Details + inline Resolved button)
 // ==========================================
-// Replace the ReportCard component in Dashboard.jsx with this
-
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import SiyandaChat from './SiyandaChat';
 
 function categoryIcon(category) {
   const icons = {
-    POTHOLE:            '🕳️',
-    WATER_LEAK:         '💧',
-    ELECTRICITY_OUTAGE: '⚡',
-    REFUSE_COLLECTION:  '🗑️',
-    STREETLIGHT:        '💡',
-    SEWAGE:             '🚰',
-    ILLEGAL_DUMPING:    '♻️',
-    GRAFFITI:           '🎨',
-    PARK_MAINTENANCE:   '🌳',
-    TRAFFIC_LIGHT:      '🚦',
-    OTHER:              '📋',
+    POTHOLE: '🕳️', WATER_LEAK: '💧', ELECTRICITY_OUTAGE: '⚡',
+    REFUSE_COLLECTION: '🗑️', STREETLIGHT: '💡', SEWAGE: '🚰',
+    ILLEGAL_DUMPING: '♻️', GRAFFITI: '🎨', PARK_MAINTENANCE: '🌳',
+    TRAFFIC_LIGHT: '🚦', OTHER: '📋',
   };
   return icons[category] || '📋';
 }
@@ -44,9 +37,15 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function ReportCard({ report, onDelete }) {
+export default function ReportCard({ report: initialReport, onDelete }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [markingResolved, setMarkingResolved] = useState(false);
+
+  const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(user?.role);
+  const reference = `#${String(report.id).padStart(4, '0')}`;
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this report?')) return;
@@ -61,11 +60,32 @@ export default function ReportCard({ report, onDelete }) {
     }
   };
 
-  const reference = `#${String(report.id).padStart(4, '0')}`;
+  // Quick "Mark as Resolved" for citizens on the card
+  const handleMarkResolved = async () => {
+    setMarkingResolved(true);
+    try {
+      const { data } = await api.patch(`/reports/${report.id}/status`, { status: 'RESOLVED' });
+      if (data.success) setReport(data.data);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update status');
+    } finally {
+      setMarkingResolved(false);
+    }
+  };
+
+  // Quick admin actions on the card
+  const handleAdminStatus = async (newStatus) => {
+    try {
+      const { data } = await api.patch(`/reports/${report.id}/status`, { status: newStatus });
+      if (data.success) setReport(data.data);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update status');
+    }
+  };
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow">
-      {/* Main Card Content */}
+      {/* Main Content */}
       <div className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -91,24 +111,75 @@ export default function ReportCard({ report, onDelete }) {
           </div>
         </div>
 
-        {/* Description preview */}
         <p className="text-slate-600 text-sm mt-3 line-clamp-2">{report.description}</p>
       </div>
 
+      {/* Quick Status Actions (inline on card) */}
+      {isAdmin && report.status === 'PENDING' && (
+        <div className="px-5 py-2 bg-blue-50 border-t border-blue-100 flex items-center gap-2">
+          <span className="text-xs text-blue-600 font-medium">Admin:</span>
+          <button
+            onClick={() => handleAdminStatus('IN_PROGRESS')}
+            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-full transition-colors"
+          >
+            🔧 Start Working
+          </button>
+          <button
+            onClick={() => handleAdminStatus('RESOLVED')}
+            className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full transition-colors"
+          >
+            ✅ Resolve
+          </button>
+          <button
+            onClick={() => handleAdminStatus('REJECTED')}
+            className="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full transition-colors"
+          >
+            ❌ Reject
+          </button>
+        </div>
+      )}
+
+      {isAdmin && report.status === 'IN_PROGRESS' && (
+        <div className="px-5 py-2 bg-blue-50 border-t border-blue-100 flex items-center gap-2">
+          <span className="text-xs text-blue-600 font-medium">Admin:</span>
+          <button
+            onClick={() => handleAdminStatus('RESOLVED')}
+            className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full transition-colors"
+          >
+            ✅ Mark Resolved
+          </button>
+          <button
+            onClick={() => handleAdminStatus('REJECTED')}
+            className="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full transition-colors"
+          >
+            ❌ Reject
+          </button>
+        </div>
+      )}
+
+      {!isAdmin && ['PENDING', 'IN_PROGRESS'].includes(report.status) && (
+        <div className="px-5 py-2 bg-green-50 border-t border-green-100 flex items-center gap-2">
+          <span className="text-xs text-slate-500">Was this fixed?</span>
+          <button
+            onClick={handleMarkResolved}
+            disabled={markingResolved}
+            className="text-xs bg-[#1a5f3c] hover:bg-[#145230] text-white px-3 py-1 rounded-full transition-colors disabled:opacity-50"
+          >
+            {markingResolved ? 'Updating...' : '✅ Yes, mark as resolved'}
+          </button>
+        </div>
+      )}
+
       {/* Action Bar */}
       <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
-        {/* Siyanda Chat Button */}
-        <SiyandaChat
-          report={report}
-          initialMessage={report.aiResponse || null}
-        />
+        <SiyandaChat report={report} initialMessage={report.aiResponse || null} />
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setExpanded((p) => !p)}
-            className="text-xs text-slate-500 hover:text-slate-700 transition-colors"
+            onClick={() => navigate(`/reports/${report.id}`)}
+            className="text-xs text-[#0d3b5c] hover:underline font-medium transition-colors"
           >
-            {expanded ? 'Less ↑' : 'More ↓'}
+            View Details →
           </button>
           <button
             onClick={handleDelete}
@@ -119,45 +190,6 @@ export default function ReportCard({ report, onDelete }) {
           </button>
         </div>
       </div>
-
-      {/* Expanded Details */}
-      {expanded && (
-        <div className="px-5 py-4 border-t border-slate-100 bg-white">
-          <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Full Description</h4>
-          <p className="text-slate-700 text-sm leading-relaxed">{report.description}</p>
-
-          <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <span className="text-slate-400">Reference</span>
-              <p className="font-semibold text-slate-700">{reference}</p>
-            </div>
-            <div>
-              <span className="text-slate-400">Status</span>
-              <p className="font-semibold text-slate-700">{report.status}</p>
-            </div>
-            <div>
-              <span className="text-slate-400">Category</span>
-              <p className="font-semibold text-slate-700">{report.category.replace(/_/g, ' ')}</p>
-            </div>
-            <div>
-              <span className="text-slate-400">Municipality</span>
-              <p className="font-semibold text-slate-700">{report.municipality}</p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-slate-400">Location</span>
-              <p className="font-semibold text-slate-700">{report.address}</p>
-            </div>
-            <div>
-              <span className="text-slate-400">Submitted</span>
-              <p className="font-semibold text-slate-700">
-                {new Date(report.createdAt).toLocaleDateString('en-ZA', {
-                  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                })}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
+import ReportDetail from './pages/ReportDetail';
 
 
 // Pages
@@ -21,6 +22,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/reports/:id" element={<ProtectedRoute><ReportDetail /></ProtectedRoute>} />
 
         {/* Protected Routes - Require Authentication */}
         <Route
