@@ -100,6 +100,8 @@ const authRoutes = require('./routes/auth.routes');
 
 app.use('/api/auth', authRoutes);
 
+const reportRoutes = require('./routes/report.routes');
+app.use('/api/reports', reportRoutes);
 
 
 // --- SERVER START ---
