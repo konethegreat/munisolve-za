@@ -13,8 +13,19 @@ const app = express();
 app.use(helmet());
 
 // 2. CORS
+const allowedOrigins = [
+  'http://localhost:5173', // Local testing
+  process.env.CLIENT_URL   // This will be your Vercel URL later
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
