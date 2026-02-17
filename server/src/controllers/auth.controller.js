@@ -9,10 +9,12 @@
 const bcrypt = require('bcryptjs'); // Password hashing
 
 
+
 // Import Prisma Client from centralized config
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library'); // For Google OAuth
 const prisma = require('../config/db.config');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ==========================================
 // USER REGISTRATION
@@ -103,7 +105,7 @@ const register = async (req, res) => {
     // STEP 5: Log activity for security audit
     await prisma.activityLog.create({
       data: {
-        userId: newUser.id,
+        userId: user.id,
         action: 'REGISTER',
         entity: 'User',
         entityId: newUser.id,
@@ -291,12 +293,14 @@ const login = async (req, res) => {
   }
 };
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 
 const googleLogin = async (req, res) => {
   try {
     const { idToken } = req.body;
+
+    console.log("Token received length:", idToken?.length);
+    console.log("Using Backend Client ID:", process.env.GOOGLE_CLIENT_ID);
 
     // 1. Verify the token with Google
     const ticket = await client.verifyIdToken({

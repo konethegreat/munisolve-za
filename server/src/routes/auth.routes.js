@@ -36,7 +36,7 @@ router.post('/login',    authLimiter, validateLogin,        handleValidationErro
 // ==========================================
 router.get('/me',       authenticate, getCurrentUser);
 router.post('/logout',  authenticate, logout);
-router.post('/google', googleLogin);
+//router.post('/google', googleLogin);
 
 // ==========================================
 // FUTURE ROUTES (Placeholders)
