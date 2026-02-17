@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import MunicipalitySelector from '../components/MunicipalitySelector';
 
 const CATEGORIES = [
   { value: 'POTHOLE', label: 'Pothole' },
@@ -190,25 +191,15 @@ export default function ReportFault() {
 
               {/* Municipality */}
               <div>
-                <label htmlFor="municipality" className="block text-sm font-medium text-slate-700 mb-1">
-                  Municipality <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="municipality"
-                  name="municipality"
-                  required
-                  value={form.municipality}
-                  onChange={handleChange}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-[#0d3b5c] focus:ring-1 focus:ring-[#0d3b5c] outline-none"
-                >
-                  <option value="">Select your municipality</option>
-                  {MUNICIPALITIES.map((muni) => (
-                    <option key={muni.value} value={muni.value}>
-                      {muni.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+  <label className="block text-sm font-medium text-slate-700 mb-1">
+    Municipality <span className="text-red-500">*</span>
+  </label>
+  <MunicipalitySelector
+    value={form.municipality}
+    onChange={handleChange}
+    required
+  />
+</div>
 
               {/* Address */}
               <div>

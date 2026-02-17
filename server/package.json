@@ -12,13 +12,13 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio"
-
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
     "@prisma/adapter-pg": "^7.4.0",
     "@prisma/client": "^6.19.2",
     "bcryptjs": "^3.0.3",
