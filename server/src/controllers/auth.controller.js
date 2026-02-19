@@ -1,62 +1,37 @@
 // ==========================================
-// AUTHENTICATION CONTROLLER (Updated)
+// AUTHENTICATION CONTROLLER (Fixed)
 // ==========================================
 // Handles user registration, login, and authentication logic
 // Author: MuniSolve ZA Development Team
 // Last Updated: February 2026
 
-// Import required packages
-const bcrypt = require('bcryptjs'); // Password hashing
-
-
-
-// Import Prisma Client from centralized config
+const bcrypt = require('bcryptjs'); 
 const jwt = require('jsonwebtoken');
-const { OAuth2Client } = require('google-auth-library'); // For Google OAuth
+const { OAuth2Client } = require('google-auth-library');
 const prisma = require('../config/db.config');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ==========================================
 // USER REGISTRATION
 // ==========================================
-/**
- * Register a new user account
- * 
- * Process:
- * 1. Check if email already exists
- * 2. Hash the password using bcrypt
- * 3. Create user in database
- * 4. Generate JWT token
- * 5. Return user data and token
- * 
- * @route POST /api/auth/register
- * @access Public (no authentication required)
- */
 const register = async (req, res) => {
   try {
-    // Extract data from request body
-    // Validation middleware has already checked these fields
     const { firstName, lastName, email, password, phone } = req.body;
 
     // STEP 1: Check if email already exists
-    // This prevents duplicate accounts
     const existingUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase() }
     });
 
     if (existingUser) {
-      // Email is already registered
       return res.status(409).json({
         success: false,
         message: 'An account with this email already exists',
-        errorCode: 'EMAIL_EXISTS',
-        hint: 'Try logging in or use the "Forgot Password" feature'
+        errorCode: 'EMAIL_EXISTS'
       });
     }
 
     // STEP 2: Hash the password
-    // NEVER store plain text passwords!
-    // Salt rounds = 12 (good balance of security and performance)
     console.log('[AUTH] Hashing password...');
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -67,14 +42,13 @@ const register = async (req, res) => {
       data: {
         firstName,
         lastName,
-        email: email.toLowerCase(), // Store email in lowercase for consistency
-        password: hashedPassword,   // Store hashed password
-        phone: phone || null,        // Phone is optional
-        role: 'CITIZEN',             // Default role for new registrations
-        isActive: true,              // Account is active by default
-        isVerified: false            // Email not verified yet
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        phone: phone || null,
+        role: 'CITIZEN',
+        isActive: true,
+        isVerified: false
       },
-      // Select fields to return (exclude password!)
       select: {
         id: true,
         firstName: true,
@@ -88,24 +62,23 @@ const register = async (req, res) => {
       }
     });
 
-    // STEP 4: Generate JWT token
-    // Token contains user ID, email, and role
+    // STEP 4: Generate JWT token (Fixed user.id -> newUser.id)
     const token = jwt.sign(
       {
-        userId: user.id,
+        userId: newUser.id,
         email: newUser.email,
         role: newUser.role
       },
-      process.env.JWT_SECRET, // Secret key from .env
+      process.env.JWT_SECRET,
       {
-        expiresIn: process.env.JWT_EXPIRES_IN || '24h' // Token expires in 24 hours
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h'
       }
     );
 
-    // STEP 5: Log activity for security audit
+    // STEP 5: Log activity (Fixed user.id -> newUser.id)
     await prisma.activityLog.create({
       data: {
-        userId: user.id,
+        userId: newUser.id,
         action: 'REGISTER',
         entity: 'User',
         entityId: newUser.id,
@@ -125,25 +98,15 @@ const register = async (req, res) => {
         user: newUser,
         token,
         expiresIn: process.env.JWT_EXPIRES_IN || '24h'
-      },
-      // Helpful next steps for the user
-      nextSteps: [
-        'Please verify your email address',
-        'Complete your profile information',
-        'Start reporting municipal issues'
-      ]
+      }
     });
 
   } catch (error) {
-    // Log the error for debugging
     console.error('[AUTH ERROR] Registration failed:', error);
-
-    // Return error response
     res.status(500).json({
       success: false,
       message: 'Registration failed. Please try again.',
       errorCode: 'REGISTRATION_ERROR',
-      // Include error details only in development
       ...(process.env.NODE_ENV === 'development' && {
         debug: error.message
       })
@@ -154,36 +117,16 @@ const register = async (req, res) => {
 // ==========================================
 // USER LOGIN
 // ==========================================
-/**
- * Authenticate user and generate JWT token
- * 
- * Process:
- * 1. Find user by email
- * 2. Check if account is active
- * 3. Verify password
- * 4. Generate JWT token
- * 5. Update last login time
- * 6. Return user data and token
- * 
- * @route POST /api/auth/login
- * @access Public (no authentication required)
- */
 const login = async (req, res) => {
   try {
-    // Extract credentials from request body
     const { email, password } = req.body;
 
-    // STEP 1: Find user by email
     console.log(`[AUTH] Login attempt for: ${email}`);
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() }
     });
 
-    // Check if user exists
     if (!user) {
-      // User not found
-      // Don't reveal whether email exists (security best practice)
-      console.log(`[AUTH] Login failed: User not found - ${email}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -191,27 +134,17 @@ const login = async (req, res) => {
       });
     }
 
-    // STEP 2: Check if account is active
     if (!user.isActive) {
-      // Account has been deactivated
-      console.log(`[AUTH] Login failed: Account deactivated - ${email}`);
       return res.status(403).json({
         success: false,
-        message: 'Your account has been deactivated. Please contact support.',
-        errorCode: 'ACCOUNT_DEACTIVATED',
-        support: 'support@munisolve.za'
+        message: 'Your account has been deactivated.',
+        errorCode: 'ACCOUNT_DEACTIVATED'
       });
     }
 
-    // STEP 3: Verify password
-    console.log('[AUTH] Verifying password...');
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      // Password is incorrect
-      console.log(`[AUTH] Login failed: Invalid password - ${email}`);
-      
-      // Log failed login attempt for security monitoring
       await prisma.activityLog.create({
         data: {
           userId: user.id,
@@ -231,7 +164,6 @@ const login = async (req, res) => {
       });
     }
 
-    // STEP 4: Generate JWT token
     const token = jwt.sign(
       {
         userId: user.id,
@@ -244,13 +176,11 @@ const login = async (req, res) => {
       }
     );
 
-    // STEP 5: Update last login timestamp
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() }
     });
 
-    // STEP 6: Log successful login
     await prisma.activityLog.create({
       data: {
         userId: user.id,
@@ -263,10 +193,6 @@ const login = async (req, res) => {
       }
     });
 
-    console.log(`[AUTH] Login successful: ${email}`);
-
-    // STEP 7: Return success response
-    // Exclude password from response
     const { password: _, ...userWithoutPassword } = user;
 
     res.status(200).json({
@@ -281,28 +207,17 @@ const login = async (req, res) => {
 
   } catch (error) {
     console.error('[AUTH ERROR] Login failed:', error);
-
     res.status(500).json({
       success: false,
-      message: 'Login failed. Please try again.',
-      errorCode: 'LOGIN_ERROR',
-      ...(process.env.NODE_ENV === 'development' && {
-        debug: error.message
-      })
+      message: 'Login failed.',
+      errorCode: 'LOGIN_ERROR'
     });
   }
 };
 
-
-
 const googleLogin = async (req, res) => {
   try {
     const { idToken } = req.body;
-
-    console.log("Token received length:", idToken?.length);
-    console.log("Using Backend Client ID:", process.env.GOOGLE_CLIENT_ID);
-
-    // 1. Verify the token with Google
     const ticket = await client.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -311,8 +226,6 @@ const googleLogin = async (req, res) => {
     const payload = ticket.getPayload();
     const { email, given_name, family_name, sub: googleId } = payload;
 
-    // 2. Find or Create the user in your database
-    // We use 'upsert' so it updates existing users or creates new ones
     let user = await prisma.user.upsert({
       where: { email },
       update: { googleId },
@@ -321,13 +234,12 @@ const googleLogin = async (req, res) => {
         firstName: given_name,
         lastName: family_name || '',
         googleId,
-        password: '', // No password needed for Google users
-        phone: 'N/A',  // Default value
+        password: '', 
+        phone: 'N/A',
         role: 'CITIZEN'
       },
     });
 
-    // 3. Generate your App's JWT token (just like regular login)
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
@@ -344,19 +256,9 @@ const googleLogin = async (req, res) => {
     res.status(401).json({ success: false, message: 'Invalid Google Token' });
   }
 };
-// ==========================================
-// GET CURRENT USER
-// ==========================================
-/**
- * Get current authenticated user's information
- * 
- * @route GET /api/auth/me
- * @access Private (requires authentication)
- */
+
 const getCurrentUser = async (req, res) => {
   try {
-    // User is already attached to req by authenticate middleware
-    // We just need to fetch fresh data from database
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
@@ -376,8 +278,7 @@ const getCurrentUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found',
-        errorCode: 'USER_NOT_FOUND'
+        message: 'User not found'
       });
     }
 
@@ -388,30 +289,15 @@ const getCurrentUser = async (req, res) => {
 
   } catch (error) {
     console.error('[AUTH ERROR] Get current user failed:', error);
-
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve user information',
-      errorCode: 'GET_USER_ERROR'
+      message: 'Failed to retrieve user'
     });
   }
 };
 
-// ==========================================
-// LOGOUT
-// ==========================================
-/**
- * Logout user (client-side token removal)
- * 
- * Note: Since we use JWT, actual logout happens on client-side
- * Server just logs the logout event for audit purposes
- * 
- * @route POST /api/auth/logout
- * @access Private (requires authentication)
- */
 const logout = async (req, res) => {
   try {
-    // Log logout event
     await prisma.activityLog.create({
       data: {
         userId: req.user.id,
@@ -424,28 +310,19 @@ const logout = async (req, res) => {
       }
     });
 
-    console.log(`[AUTH] User logged out: ${req.user.email}`);
-
     res.status(200).json({
       success: true,
-      message: 'Logout successful',
-      hint: 'Please remove the token from client storage'
+      message: 'Logout successful'
     });
 
   } catch (error) {
-    console.error('[AUTH ERROR] Logout failed:', error);
-
     res.status(500).json({
       success: false,
-      message: 'Logout failed',
-      errorCode: 'LOGOUT_ERROR'
+      message: 'Logout failed'
     });
   }
 };
 
-// ==========================================
-// EXPORT CONTROLLER FUNCTIONS
-// ==========================================
 module.exports = {
   register,
   login,
