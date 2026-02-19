@@ -13,16 +13,20 @@ const app = express();
 app.use(helmet());
 
 // 2. CORS
+// 2. CORS - Updated for better reliability
 const allowedOrigins = [
-  'http://localhost:5173', // Local testing
-  process.env.CLIENT_URL   // This will be your Vercel URL later
-];
+  'http://localhost:5173',
+  process.env.CLIENT_URL?.replace(/\/$/, "") // Removes trailing slash if present
+].filter(Boolean); // Removes undefined values
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // Allow requests with no origin (like mobile apps or curl) 
+    // or if the origin is in our allowed list
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log("Blocked by CORS:", origin); // Helps you debug in Render logs!
       callback(new Error('Not allowed by CORS'));
     }
   },
