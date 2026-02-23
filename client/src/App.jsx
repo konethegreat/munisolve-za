@@ -6,9 +6,9 @@ import { AuthProvider } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import ReportDetail from './pages/ReportDetail';
 
-
 // Pages
 import LandingPage from './pages/LandingPage';
+import About from './pages/About';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -20,6 +20,7 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/about" element={<About />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reports/:id" element={<ProtectedRoute><ReportDetail /></ProtectedRoute>} />
