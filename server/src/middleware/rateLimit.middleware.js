@@ -5,11 +5,13 @@
 // Author: MuniSolve ZA Security Team
 
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit'); // helper to generate keys based on IP
 
 // Auth routes: 5 attempts per 15 minutes (register/login)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  skipSuccessfulRequests: true, // only counts failed requests
   message: { success: false, message: 'Too many attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -19,6 +21,7 @@ const authLimiter = rateLimit({
 const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
+  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req), 
   message: { success: false, message: 'Too many password reset requests.' },
   standardHeaders: true,
   legacyHeaders: false,

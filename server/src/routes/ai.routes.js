@@ -5,10 +5,13 @@ const express = require('express');
 const router = express.Router();
 const { chat } = require('../controllers/ai.controller');
 const { authenticate } = require('../middleware/auth.middleware');
+const { generalLimiter } = require('../middleware/rateLimit.middleware');
+
 
 
 
 // All AI routes require authentication
+router.use(generalLimiter);
 router.use(authenticate);
 
 /**

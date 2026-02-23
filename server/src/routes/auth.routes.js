@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 
+
 // Import controllers
 const {
   register,
@@ -20,10 +21,7 @@ const {
   validateLogin,
   handleValidationErrors
 } = require('../middleware/validation.middleware');
-const {
-  authLimiter,
-  passwordResetLimiter
-} = require('../middleware/rateLimit.middleware');
+const { authLimiter, passwordResetLimiter } = require('../middleware/rateLimit.middleware');
 
 // ==========================================
 // PUBLIC ROUTES

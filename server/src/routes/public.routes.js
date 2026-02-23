@@ -7,6 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { generalLimiter } = require('../middleware/rateLimit.middleware');
 
 
 
@@ -20,7 +21,7 @@ const router = express.Router();
  * @desc    Get public dashboard statistics
  * @access  Public
  */
-router.get('/dashboard', (req, res) => {
+router.get('/dashboard', generalLimiter, (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Public dashboard endpoint - Coming soon',
@@ -39,7 +40,7 @@ router.get('/dashboard', (req, res) => {
  * @desc    Get all municipalities
  * @access  Public
  */
-router.get('/municipalities', (req, res) => {
+router.get('/municipalities', generalLimiter, (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Municipalities endpoint - Coming soon',
