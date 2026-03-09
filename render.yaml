@@ -1,0 +1,17 @@
+# Render Blueprint – backend (server) only.
+# Frontend is on Vercel; set Root Directory to "server" for this service in the dashboard if not using this file.
+
+services:
+  - type: web
+    name: munisolve-api
+    runtime: node
+    rootDir: server
+
+    # Install deps, generate Prisma client, run pending migrations, then start.
+    # Migrations run during build so production DB is up to date before the new instance starts.
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy
+    startCommand: npm start
+
+    envVars:
+      - key: NODE_ENV
+        value: production
