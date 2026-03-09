@@ -41,9 +41,13 @@ const getWeatherForLocation = async (latitude, longitude) => {
       return null;
     }
 
+    console.log('[WEATHER] Fetching for:', latitude, longitude);
+
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&wind_speed_unit=kmh&timezone=Africa/Johannesburg`;
     
     const response = await fetch(url);
+    
+    console.log('[WEATHER] Response status:', response.status);
     
     if (!response.ok) {
       return null;
@@ -51,20 +55,27 @@ const getWeatherForLocation = async (latitude, longitude) => {
 
     const data = await response.json();
     
+    console.log('[WEATHER] Raw data:', JSON.stringify(data));
+    
     if (!data.current) {
       return null;
     }
 
     const current = data.current;
     
-    return {
+    const result = {
       weatherTemp: current.temperature_2m,
       weatherCondition: getWeatherCondition(current.weather_code),
       weatherRainfall: current.precipitation,
       weatherWind: current.wind_speed_10m,
       weatherHumidity: current.relative_humidity_2m
     };
+    
+    console.log('[WEATHER] Result:', result);
+    
+    return result;
   } catch (error) {
+    console.log('[WEATHER] Error:', error);
     // Weather is non-critical, so we return null on any error
     return null;
   }
