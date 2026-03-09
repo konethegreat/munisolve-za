@@ -1,3 +1,4 @@
+import { createElement } from 'react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import {
@@ -96,14 +97,14 @@ export default function About() {
               Skills & Tech Stack
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {SKILL_CATEGORIES.map(({ title, icon: Icon, items }) => (
+              {SKILL_CATEGORIES.map(({ title, icon, items }) => (
                 <div
                   key={title}
                   className="bg-white rounded-lg shadow-sm border border-slate-200/80 p-5"
                 >
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-2 rounded-md bg-[#0d3b5c]/10 text-[#0d3b5c]">
-                      <Icon size={20} />
+                      {createElement(icon, { size: 20 })}
                     </div>
                     <h3 className="font-semibold text-[#0d3b5c]">{title}</h3>
                   </div>
@@ -130,7 +131,7 @@ export default function About() {
               Connect
             </h2>
             <div className="flex flex-wrap justify-center gap-4">
-              {SOCIAL_LINKS.map(({ label, href, icon: Icon }) => (
+              {SOCIAL_LINKS.map(({ label, href, icon }) => (
                 <a
                   key={label}
                   href={href}
@@ -138,7 +139,7 @@ export default function About() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-[#0d3b5c] hover:bg-[#0a2d45] text-white font-medium py-2.5 px-4 rounded-md transition-colors text-sm"
                 >
-                  <Icon size={18} />
+                  {createElement(icon, { size: 18 })}
                   {label}
                 </a>
               ))}
