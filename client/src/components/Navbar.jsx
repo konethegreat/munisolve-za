@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LayoutDashboard, LogIn, UserPlus } from 'lucide-react'
+import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LayoutDashboard, LogIn, UserPlus, Shield } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(user?.role)
 
   return (
     <nav className="bg-[#0d3b5c] text-white shadow-md">
@@ -54,6 +55,16 @@ export default function Navbar() {
               >
                 <LayoutDashboard size={18} />
                 Dashboard
+              </Link>
+            )}
+            {isAuthenticated && isAdmin && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-1.5 bg-[#e8b923] text-[#0d3b5c] hover:bg-[#f2cd4c] transition-colors rounded-md px-3 py-2 font-semibold shadow-sm"
+                aria-label="Admin Panel"
+              >
+                <Shield size={18} className="opacity-90" />
+                Admin Panel
               </Link>
             )}
             <Link
@@ -127,6 +138,17 @@ export default function Navbar() {
                 >
                   <LayoutDashboard size={18} />
                   Dashboard
+                </Link>
+              )}
+              {isAuthenticated && isAdmin && (
+                <Link
+                  to="/admin"
+                  className="flex items-center gap-2 px-4 py-3 bg-[#e8b923] text-[#0d3b5c] rounded-md mx-2 font-semibold shadow-sm"
+                  onClick={() => setOpen(false)}
+                  aria-label="Admin Panel"
+                >
+                  <Shield size={18} className="opacity-90" />
+                  Admin Panel
                 </Link>
               )}
               <Link
