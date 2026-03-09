@@ -4,6 +4,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import ReportDetail from './pages/ReportDetail';
 
 // Pages
@@ -14,6 +15,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ReportFault from './pages/ReportFault';
 import MapPage from './pages/MapPage';
+import Admin from './pages/Admin';
 
 function App() {
   return (
@@ -49,6 +51,14 @@ function App() {
             <ProtectedRoute>
               <MapPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <Admin />
+            </AdminRoute>
           }
         />
       </Routes>
