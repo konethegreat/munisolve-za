@@ -1,46 +1,12 @@
 const weatherCache = {};
 
-const getWeatherCondition = (weatherCode) => {
-  switch (weatherCode) {
-    case 0:
-      return "Clear Sky";
-    case 1:
-    case 2:
-    case 3:
-      return "Partly Cloudy";
-    case 45:
-    case 48:
-      return "Foggy";
-    case 51:
-    case 53:
-    case 55:
-      return "Drizzle";
-    case 61:
-    case 63:
-    case 65:
-      return "Rainy";
-    case 71:
-    case 73:
-    case 75:
-      return "Snowy";
-    case 80:
-    case 81:
-    case 82:
-      return "Rain Showers";
-    case 95:
-      return "Thunderstorm";
-    case 96:
-    case 99:
-      return "Thunderstorm with Hail";
-    default:
-      return "Cloudy";
-  }
-};
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 const getWeatherForLocation = async (latitude, longitude) => {
   try {
+    if (!process.env.WEATHER_API_KEY) {
+      console.log('[WEATHER] No API key set, skipping');
+      return null;
+    }
+
     if (!latitude || !longitude) {
       return null;
     }
@@ -60,46 +26,12 @@ const getWeatherForLocation = async (latitude, longitude) => {
 
     console.log('[WEATHER] Fetching for:', latitude, longitude);
 
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&wind_speed_unit=kmh&timezone=Africa/Johannesburg`;
+    const url = `http://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${lat},${lon}&aqi=no`;
     
-    const headers = {
-      'User-Agent': 'MuniSolveZA/1.0 (erictshivhinda@gmail.com)',
-      'Accept': 'application/json'
-    };
-
-    let response;
-    let attempts = 0;
-    const maxAttempts = 3;
-    const delays = [0, 2000, 3000]; // delays between attempts
-
-    while (attempts < maxAttempts) {
-      try {
-        response = await fetch(url, { headers });
-        console.log('[WEATHER] Response status:', response.status);
-        
-        if (response.status === 429) {
-          attempts++;
-          if (attempts < maxAttempts) {
-            console.log(`[WEATHER] Rate limited, attempt ${attempts}/${maxAttempts}, waiting ${delays[attempts]}ms`);
-            await sleep(delays[attempts]);
-            continue;
-          }
-          console.log('[WEATHER] Rate limited, skipping');
-          return null;
-        }
-        
-        break; // Success or non-429 error, exit retry loop
-      } catch (fetchError) {
-        attempts++;
-        if (attempts < maxAttempts) {
-          console.log(`[WEATHER] Fetch error, attempt ${attempts}/${maxAttempts}, waiting ${delays[attempts]}ms:`, fetchError.message);
-          await sleep(delays[attempts]);
-          continue;
-        }
-        throw fetchError; // Re-throw after max attempts
-      }
-    }
-
+    const response = await fetch(url);
+    
+    console.log('[WEATHER] Response status:', response.status);
+    
     if (!response.ok) {
       return null;
     }
@@ -115,11 +47,11 @@ const getWeatherForLocation = async (latitude, longitude) => {
     const current = data.current;
     
     const result = {
-      weatherTemp: current.temperature_2m,
-      weatherCondition: getWeatherCondition(current.weather_code),
-      weatherRainfall: current.precipitation,
-      weatherWind: current.wind_speed_10m,
-      weatherHumidity: current.relative_humidity_2m
+      weatherTemp: current.temp_c,
+      weatherCondition: current.condition.text,
+      weatherRainfall: current.precip_mm,
+      weatherWind: current.wind_kph,
+      weatherHumidity: current.humidity
     };
     
     // Cache the successful result
