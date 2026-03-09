@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import SiyandaChat from './SiyandaChat';
+import WeatherBadge from './WeatherBadge';
 
 function categoryIcon(category) {
   const icons = {
@@ -110,6 +111,14 @@ export default function ReportCard({ report: initialReport, onDelete }) {
             </span>
           </div>
         </div>
+
+        <WeatherBadge 
+          weatherCondition={report.weatherCondition}
+          weatherTemp={report.weatherTemp}
+          weatherRainfall={report.weatherRainfall}
+          weatherWind={report.weatherWind}
+          weatherHumidity={report.weatherHumidity}
+        />
 
         <p className="text-slate-600 text-sm mt-3 line-clamp-2">{report.description}</p>
       </div>
