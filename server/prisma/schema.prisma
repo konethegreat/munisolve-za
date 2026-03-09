@@ -39,17 +39,22 @@ model ActivityLog {
 }
 
 model Report {
-  id           Int      @id @default(autoincrement())
-  title        String
-  description  String
-  category     String
-  municipality String
-  address      String?
-  latitude     Float?
-  longitude    Float?
-  status       String   @default("PENDING")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  userId       Int
-  user         User     @relation(fields: [userId], references: [id])
+  id              Int      @id @default(autoincrement())
+  title           String
+  description     String
+  category        String
+  municipality    String
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  status          String   @default("PENDING")
+  weatherTemp      Float?
+weatherCondition String?
+weatherRainfall  Float?
+weatherWind      Float?
+weatherHumidity  Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
 }
