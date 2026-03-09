@@ -6,11 +6,21 @@ const { generateAutoResponse } = require('./ai.controller');
 
 const createReport = async (req, res) => {
   try {
-    const { title, description, category, municipality, address } = req.body;
+    const { title, description, category, municipality, address, latitude, longitude } = req.body;
     const userId = req.user.id;
 
     const report = await prisma.report.create({
-      data: { title, description, category, municipality, address, status: 'PENDING', userId },
+      data: {
+        title,
+        description,
+        category,
+        municipality,
+        ...(address !== undefined && { address }),
+        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
+        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
+        status: 'PENDING',
+        userId,
+      },
       include: {
         user: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
@@ -197,7 +207,7 @@ const updateReport = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const { title, description, category, municipality, address } = req.body;
+    const { title, description, category, municipality, address, latitude, longitude } = req.body;
 
     const existing = await prisma.report.findFirst({ where: { id: parseInt(id), userId } });
     if (!existing) {
@@ -211,7 +221,9 @@ const updateReport = async (req, res) => {
         ...(description && { description }),
         ...(category && { category }),
         ...(municipality && { municipality }),
-        ...(address && { address }),
+        ...(address !== undefined && { address }),
+        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
+        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
       },
     });
 

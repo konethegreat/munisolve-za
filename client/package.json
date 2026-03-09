@@ -13,9 +13,12 @@
     "@react-oauth/google": "^0.13.4",
     "@tailwindcss/postcss": "^4.1.18",
     "axios": "^1.13.5",
+    "leaflet": "^1.9.4",
+    "leaflet.heat": "^0.2.0",
     "lucide-react": "^0.564.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.13.0"
   },
   "devDependencies": {

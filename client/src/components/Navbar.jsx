@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, X, Home, ClipboardList, UserCircle, LogIn, UserPlus } from 'lucide-react'
+import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LogIn, UserPlus } from 'lucide-react'
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
@@ -30,6 +30,13 @@ export default function Navbar() {
             >
               <ClipboardList size={18} />
               Report Fault
+            </Link>
+            <Link
+              to="/map"
+              className="flex items-center gap-1.5 text-white/90 hover:text-[#e8b923] transition-colors rounded-md px-3 py-2"
+            >
+              <MapPin size={18} />
+              Map
             </Link>
             <Link
               to="/about"
@@ -84,6 +91,14 @@ export default function Navbar() {
               >
                 <ClipboardList size={18} />
                 Report Fault
+              </Link>
+              <Link
+                to="/map"
+                className="flex items-center gap-2 px-4 py-3 text-white/90 hover:bg-white/10 rounded-md"
+                onClick={() => setOpen(false)}
+              >
+                <MapPin size={18} />
+                Map
               </Link>
               <Link
                 to="/about"

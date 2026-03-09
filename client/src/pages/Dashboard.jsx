@@ -8,6 +8,7 @@ import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ReportCard from '../components/ReportCard';
+import IncidentMap from '../components/IncidentMap';
 
 // ==========================================
 // MAIN DASHBOARD COMPONENT
@@ -135,6 +136,21 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 text-center">
               <p className="text-3xl font-bold text-green-600">{stats.resolved}</p>
               <p className="text-slate-500 text-sm mt-1">Resolved</p>
+            </div>
+          </div>
+
+          {/* ================================ */}
+          {/* INCIDENT MAP */}
+          {/* ================================ */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100">
+              <h2 className="text-lg font-bold text-[#0d3b5c]">Incident Map</h2>
+              <p className="text-slate-500 text-sm mt-0.5">
+                Reports with location (Johannesburg area)
+              </p>
+            </div>
+            <div className="w-full">
+              <IncidentMap reports={reports} />
             </div>
           </div>
 

@@ -1,13 +1,32 @@
 // ==========================================
 // REPORT FAULT PAGE (Complete Functional Form)
 // ==========================================
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import MunicipalitySelector from '../components/MunicipalitySelector';
+
+const NOMINATIM_HEADERS = {
+  'User-Agent': 'MuniSolveZA/1.0 (erictshivhinda@gmail.com)',
+};
+
+async function nominatimSearch(query) {
+  if (!query || query.trim().length < 2) return [];
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&countrycodes=za&format=json&limit=5`;
+  const res = await fetch(url, { headers: NOMINATIM_HEADERS });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+async function nominatimReverse(lat, lon) {
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+  const res = await fetch(url, { headers: NOMINATIM_HEADERS });
+  if (!res.ok) return null;
+  return res.json();
+}
 
 const CATEGORIES = [
   { value: 'POTHOLE', label: 'Pothole' },
@@ -44,15 +63,122 @@ export default function ReportFault() {
     category: '',
     municipality: '',
     address: '',
+    latitude: null,
+    longitude: null,
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [addressSuggestionsLoading, setAddressSuggestionsLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const skipAddressSearchRef = useRef(false);
+  const addressWrapperRef = useRef(null);
 
   const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === 'address') {
+      skipAddressSearchRef.current = false;
+      setAddressSuggestions([]);
+    }
     setError('');
   };
+
+  // Debounced Nominatim search (400ms)
+  useEffect(() => {
+    if (skipAddressSearchRef.current) return;
+    const q = form.address?.trim() || '';
+    if (q.length < 2) {
+      setAddressSuggestions([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setAddressSuggestionsLoading(true);
+      try {
+        const results = await nominatimSearch(form.address);
+        setAddressSuggestions(Array.isArray(results) ? results : []);
+      } catch {
+        setAddressSuggestions([]);
+      } finally {
+        setAddressSuggestionsLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [form.address]);
+
+  // Click outside to close address dropdown
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (addressWrapperRef.current && !addressWrapperRef.current.contains(e.target)) {
+        setAddressSuggestions([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectAddress = useCallback((result) => {
+    const displayName = result.display_name || '';
+    const lat = result.lat != null ? parseFloat(result.lat) : null;
+    const lon = result.lon != null ? parseFloat(result.lon) : null;
+    setForm((prev) => ({
+      ...prev,
+      address: displayName,
+      latitude: lat,
+      longitude: lon,
+    }));
+    setAddressSuggestions([]);
+    skipAddressSearchRef.current = true;
+  }, []);
+
+  const handleUseCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocationLoading(true);
+    setError('');
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const data = await nominatimReverse(latitude, longitude);
+          if (data && data.display_name) {
+            setForm((prev) => ({
+              ...prev,
+              address: data.display_name,
+              latitude,
+              longitude,
+            }));
+            setAddressSuggestions([]);
+            skipAddressSearchRef.current = true;
+          } else {
+            setForm((prev) => ({
+              ...prev,
+              address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+              latitude,
+              longitude,
+            }));
+          }
+        } catch {
+          setForm((prev) => ({
+            ...prev,
+            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+            latitude,
+            longitude,
+          }));
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      () => {
+        setLocationLoading(false);
+        setError('Could not get your location. Please allow location access or enter an address manually.');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -61,7 +187,12 @@ export default function ReportFault() {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/reports', form);
+      const payload = {
+        ...form,
+        latitude: form.latitude ?? undefined,
+        longitude: form.longitude ?? undefined,
+      };
+      const { data } = await api.post('/reports', payload);
       
       if (data.success) {
         setSuccess(true);
@@ -72,6 +203,8 @@ export default function ReportFault() {
           category: '',
           municipality: '',
           address: '',
+          latitude: null,
+          longitude: null,
         });
         
         // Redirect to dashboard after 2 seconds
@@ -201,10 +334,10 @@ export default function ReportFault() {
   />
 </div>
 
-              {/* Address */}
-              <div>
+              {/* Street Address with Nominatim autocomplete */}
+              <div ref={addressWrapperRef} className="relative">
                 <label htmlFor="address" className="block text-sm font-medium text-slate-700 mb-1">
-                  Location / Address <span className="text-red-500">*</span>
+                  Street Address <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="address"
@@ -212,12 +345,40 @@ export default function ReportFault() {
                   type="text"
                   required
                   minLength={5}
-                  maxLength={200}
+                  maxLength={500}
                   value={form.address}
                   onChange={handleChange}
+                  autoComplete="off"
                   className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-[#0d3b5c] focus:ring-1 focus:ring-[#0d3b5c] outline-none"
-                  placeholder="e.g., Corner of Main Road and Church Street"
+                  placeholder="Start typing an address in South Africa..."
                 />
+                {addressSuggestionsLoading && (
+                  <p className="absolute left-3 top-full mt-1 text-xs text-slate-500">Searching...</p>
+                )}
+                {addressSuggestions.length > 0 && (
+                  <ul className="absolute z-10 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg max-h-48 overflow-auto">
+                    {addressSuggestions.map((result, i) => (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 border-b border-slate-100 last:border-0"
+                          onClick={() => selectAddress(result)}
+                        >
+                          {result.display_name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={locationLoading}
+                  className="mt-2 text-sm text-[#0d3b5c] hover:underline font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {locationLoading ? 'Getting location...' : 'Use my current location'}
+                </button>
+                {/* Hidden state: lat/lon are in form.latitude, form.longitude and submitted with form */}
               </div>
 
               {/* Description */}
