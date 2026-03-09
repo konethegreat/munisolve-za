@@ -186,6 +186,13 @@ export default function ReportFault() {
     setSuccess(false);
     setLoading(true);
 
+    // Validate coordinates are present
+    if (form.latitude === null || form.longitude === null) {
+      setError("Please select an address from the dropdown suggestions, or use 'Use my current location' to ensure your report is pinned on the map.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const payload = {
         ...form,
@@ -378,6 +385,12 @@ export default function ReportFault() {
                 >
                   {locationLoading ? 'Getting location...' : 'Use my current location'}
                 </button>
+                {/* Location status messages */}
+                {form.latitude !== null ? (
+                  <p className="mt-1 text-green-600 text-xs">📍 Location pinned successfully</p>
+                ) : form.address.trim().length > 0 ? (
+                  <p className="mt-1 text-amber-500 text-xs">⚠️ Select a suggestion to pin this location</p>
+                ) : null}
                 {/* Hidden state: lat/lon are in form.latitude, form.longitude and submitted with form */}
               </div>
 
