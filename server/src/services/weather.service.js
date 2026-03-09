@@ -1,3 +1,4 @@
+console.log('[WEATHER] API KEY:', process.env.WEATHER_API_KEY ? 'LOADED' : 'MISSING')
 const weatherCache = {};
 
 const getWeatherForLocation = async (latitude, longitude) => {
