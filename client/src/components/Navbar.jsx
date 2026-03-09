@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LogIn, UserPlus } from 'lucide-react'
+import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LayoutDashboard, LogIn, UserPlus } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
+  const { isAuthenticated } = useAuth()
 
   return (
     <nav className="bg-[#0d3b5c] text-white shadow-md">
@@ -45,6 +47,15 @@ export default function Navbar() {
               <UserCircle size={18} />
               About
             </Link>
+            {isAuthenticated && (
+              <Link
+                to="/dashboard"
+                className="flex items-center gap-1.5 text-white/90 hover:text-[#e8b923] transition-colors rounded-md px-3 py-2"
+              >
+                <LayoutDashboard size={18} />
+                Dashboard
+              </Link>
+            )}
             <Link
               to="/login"
               className="flex items-center gap-1.5 bg-white/10 hover:bg-[#e8b923] hover:text-[#0d3b5c] text-white rounded-md px-4 py-2 transition-colors"
@@ -108,6 +119,16 @@ export default function Navbar() {
                 <UserCircle size={18} />
                 About
               </Link>
+              {isAuthenticated && (
+                <Link
+                  to="/dashboard"
+                  className="flex items-center gap-2 px-4 py-3 text-white/90 hover:bg-white/10 rounded-md"
+                  onClick={() => setOpen(false)}
+                >
+                  <LayoutDashboard size={18} />
+                  Dashboard
+                </Link>
+              )}
               <Link
                 to="/login"
                 className="flex items-center gap-2 px-4 py-3 text-white/90 hover:bg-white/10 rounded-md"
