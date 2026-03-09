@@ -3,11 +3,18 @@
 // ==========================================
 const prisma = require('../config/db.config');
 const { generateAutoResponse } = require('./ai.controller');
+const { getWeatherForLocation } = require('../services/weather.service');
 
 const createReport = async (req, res) => {
   try {
     const { title, description, category, municipality, address, latitude, longitude } = req.body;
     const userId = req.user.id;
+
+    // Fetch weather data if coordinates are provided
+    let weatherData = null;
+    if (latitude && longitude) {
+      weatherData = await getWeatherForLocation(parseFloat(latitude), parseFloat(longitude));
+    }
 
     const report = await prisma.report.create({
       data: {
@@ -18,6 +25,13 @@ const createReport = async (req, res) => {
         ...(address !== undefined && { address }),
         ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
         ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
+        ...(weatherData && {
+          weatherTemp: weatherData.weatherTemp,
+          weatherCondition: weatherData.weatherCondition,
+          weatherRainfall: weatherData.weatherRainfall,
+          weatherWind: weatherData.weatherWind,
+          weatherHumidity: weatherData.weatherHumidity,
+        }),
         status: 'PENDING',
         userId,
       },
