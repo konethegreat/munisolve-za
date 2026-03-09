@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import WeatherBadge from './WeatherBadge';
 
 // Fix default Leaflet marker icon broken image (webpack/vite path issue)
 delete L.Icon.Default.prototype._getIconUrl;
@@ -35,6 +36,30 @@ function formatDate(dateStr) {
     month: 'short',
     year: 'numeric',
   });
+}
+
+function getWeatherEmoji(condition) {
+  switch (condition) {
+    case "Clear Sky":
+      return "☀️";
+    case "Partly Cloudy":
+      return "⛅";
+    case "Foggy":
+      return "🌫️";
+    case "Drizzle":
+      return "🌦️";
+    case "Rainy":
+    case "Rain Showers":
+      return "🌧️";
+    case "Snowy":
+      return "❄️";
+    case "Thunderstorm":
+      return "⛈️";
+    case "Thunderstorm with Hail":
+      return "⛈️";
+    default:
+      return "🌤️";
+  }
 }
 
 function MapLegend() {
@@ -129,6 +154,21 @@ export default function IncidentMap({ reports = [] }) {
                   <span style={{ fontWeight: 500 }}>Status:</span>{' '}
                   {report.status.replace(/_/g, ' ')}
                 </div>
+                {/* Weather information */}
+                {report.weatherCondition && (
+                  <div style={{ fontSize: 12, marginBottom: 2 }}>
+                    <span style={{ fontWeight: 500 }}>Weather:</span>{' '}
+                    {getWeatherEmoji(report.weatherCondition)} {report.weatherCondition}
+                    {report.weatherTemp !== null && report.weatherTemp !== undefined && (
+                      <span> · {Math.round(report.weatherTemp)}°C</span>
+                    )}
+                  </div>
+                )}
+                {report.weatherRainfall > 20 && (
+                  <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 500, marginBottom: 2 }}>
+                    ⚠️ Flood Risk
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: '#64748b' }}>
                   Submitted: {formatDate(report.createdAt)}
                 </div>

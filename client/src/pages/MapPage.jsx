@@ -16,6 +16,7 @@ import {
   formatDate,
   truncate,
 } from '../utils/mapUtils';
+import WeatherBadge from '../components/WeatherBadge';
 
 // Fix default Leaflet marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -31,6 +32,30 @@ const STATUS_OPTIONS = [
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'RESOLVED', label: 'Resolved' },
 ];
+
+function getWeatherEmoji(condition) {
+  switch (condition) {
+    case "Clear Sky":
+      return "☀️";
+    case "Partly Cloudy":
+      return "⛅";
+    case "Foggy":
+      return "🌫️";
+    case "Drizzle":
+      return "🌦️";
+    case "Rainy":
+    case "Rain Showers":
+      return "🌧️";
+    case "Snowy":
+      return "❄️";
+    case "Thunderstorm":
+      return "⛈️";
+    case "Thunderstorm with Hail":
+      return "⛈️";
+    default:
+      return "🌤️";
+  }
+}
 
 function StatusBadge({ status }) {
   const styles = {
@@ -306,12 +331,27 @@ export default function MapPage() {
                           {report.address && (
                             <p className="text-xs text-slate-500 mb-2">{report.address}</p>
                           )}
-                          <div className="flex items-center justify-between flex-wrap gap-1">
+                          <div className="flex items-center justify-between flex-wrap gap-1 mb-2">
                             <StatusBadge status={report.status} />
                             <span className="text-xs text-slate-400">
                               {formatDate(report.createdAt)}
                             </span>
                           </div>
+                          {/* Weather information */}
+                          {report.weatherCondition && (
+                            <div className="text-xs text-slate-600 mb-1">
+                              <span className="font-medium">Weather:</span>{' '}
+                              {getWeatherEmoji(report.weatherCondition)} {report.weatherCondition}
+                              {report.weatherTemp !== null && report.weatherTemp !== undefined && (
+                                <span> · {Math.round(report.weatherTemp)}°C</span>
+                              )}
+                            </div>
+                          )}
+                          {report.weatherRainfall > 20 && (
+                            <div className="text-xs text-red-600 font-medium mb-1">
+                              ⚠️ Flood Risk
+                            </div>
+                          )}
                         </div>
                       </Popup>
                     </CircleMarker>

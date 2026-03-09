@@ -3,6 +3,7 @@ import { Shield, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import WeatherBadge from '../components/WeatherBadge';
 
 const REPORT_STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending' },
@@ -56,6 +57,7 @@ export default function Admin() {
   const [reportsError, setReportsError] = useState('');
   const [reportSearch, setReportSearch] = useState('');
   const [reportStatusFilter, setReportStatusFilter] = useState('ALL'); // ALL | PENDING | IN_PROGRESS | RESOLVED
+  const [reportWeatherFilter, setReportWeatherFilter] = useState('ALL'); // ALL | HIGH_RAINFALL | ANY_RAINFALL | DRY
   const [reportUpdatingId, setReportUpdatingId] = useState(null);
   const [reportDeletingId, setReportDeletingId] = useState(null);
 
@@ -127,12 +129,25 @@ export default function Admin() {
     return reports.filter((r) => {
       const statusOk = reportStatusFilter === 'ALL' ? true : r.status === reportStatusFilter;
       if (!statusOk) return false;
+      
+      // Weather filter
+      const rainfall = r.weatherRainfall || 0;
+      let weatherOk = true;
+      if (reportWeatherFilter === 'HIGH_RAINFALL') {
+        weatherOk = rainfall > 20;
+      } else if (reportWeatherFilter === 'ANY_RAINFALL') {
+        weatherOk = rainfall > 0;
+      } else if (reportWeatherFilter === 'DRY') {
+        weatherOk = rainfall === 0;
+      }
+      if (!weatherOk) return false;
+      
       if (!q) return true;
       const category = normalize(r.category);
       const status = normalize(r.status);
       return category.includes(q) || status.includes(q);
     });
-  }, [reports, reportSearch, reportStatusFilter]);
+  }, [reports, reportSearch, reportStatusFilter, reportWeatherFilter]);
 
   const handleReportStatusChange = async (reportId, newStatus) => {
     setReportUpdatingId(reportId);
@@ -266,6 +281,16 @@ export default function Admin() {
                       <option value="IN_PROGRESS">In Progress</option>
                       <option value="RESOLVED">Resolved</option>
                     </select>
+                    <select
+                      value={reportWeatherFilter}
+                      onChange={(e) => setReportWeatherFilter(e.target.value)}
+                      className="w-full sm:w-44 text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white outline-none focus:border-[#0d3b5c]"
+                    >
+                      <option value="ALL">All Weather</option>
+                      <option value="HIGH_RAINFALL">⚠️ High Rainfall (&gt;20mm)</option>
+                      <option value="ANY_RAINFALL">🌧️ Any Rainfall (&gt;0mm)</option>
+                      <option value="DRY">☀️ Dry Conditions</option>
+                    </select>
                     <button
                       type="button"
                       onClick={fetchReports}
@@ -302,6 +327,7 @@ export default function Admin() {
                         onClick={() => {
                           setReportSearch('');
                           setReportStatusFilter('ALL');
+                          setReportWeatherFilter('ALL');
                         }}
                         className="mt-3 text-sm text-[#0d3b5c] hover:underline"
                       >
@@ -316,6 +342,7 @@ export default function Admin() {
                             <th className="py-3 pr-4 font-semibold">Reporter Name</th>
                             <th className="py-3 pr-4 font-semibold">Category</th>
                             <th className="py-3 pr-4 font-semibold">Address</th>
+                            <th className="py-3 pr-4 font-semibold">Weather</th>
                             <th className="py-3 pr-4 font-semibold">Status</th>
                             <th className="py-3 pr-4 font-semibold">Date Submitted</th>
                             <th className="py-3 font-semibold text-right">Actions</th>
@@ -341,6 +368,19 @@ export default function Admin() {
                                 <span className="text-slate-700">
                                   {r.address || '—'}
                                 </span>
+                              </td>
+                              <td className="py-4 pr-4">
+                                {r.weatherCondition || r.weatherTemp !== null || r.weatherRainfall !== null ? (
+                                  <WeatherBadge 
+                                    weatherCondition={r.weatherCondition}
+                                    weatherTemp={r.weatherTemp}
+                                    weatherRainfall={r.weatherRainfall}
+                                    weatherWind={r.weatherWind}
+                                    weatherHumidity={r.weatherHumidity}
+                                  />
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
                               </td>
                               <td className="py-4 pr-4">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClasses(r.status)}`}>
