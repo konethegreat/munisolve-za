@@ -1,3 +1,4 @@
 {
-  "prisma.prismaPath": "server/node_modules/prisma"
+  "prisma.prismaPath": "server/node_modules/prisma",
+  "postman.settings.dotenv-detection-notification-visibility": false
 }
