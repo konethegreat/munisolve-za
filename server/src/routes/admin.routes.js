@@ -1,6 +1,3 @@
-// ==========================================
-// ADMIN ROUTES
-// ==========================================
 const express = require('express');
 const router = express.Router();
 
@@ -8,26 +5,39 @@ const { generalLimiter } = require('../middleware/rateLimit.middleware');
 const { requireAdmin } = require('../middleware/requireAdmin.middleware');
 
 const {
+  getAdminDashboard,
   getAdminReports,
+  getAdminReport,
   patchAdminReportStatus,
   deleteAdminReport,
   getAdminUsers,
+  getAdminUser,
+  patchAdminUserStatus,
+  patchAdminUserRole,
+  deleteAdminUser,
+  getAdminActivityLogs,
 } = require('../controllers/admin.controller');
 
 router.use(generalLimiter);
 router.use(requireAdmin);
 
-// 1) GET /api/admin/reports
-router.get('/reports', getAdminReports);
+// Dashboard
+router.get('/dashboard', getAdminDashboard);
 
-// 2) PATCH /api/admin/reports/:id/status
-router.patch('/reports/:id/status', patchAdminReportStatus);
+// Reports
+router.get('/reports',                    getAdminReports);
+router.get('/reports/:id',                getAdminReport);
+router.patch('/reports/:id/status',       patchAdminReportStatus);
+router.delete('/reports/:id',             deleteAdminReport);
 
-// 3) DELETE /api/admin/reports/:id
-router.delete('/reports/:id', deleteAdminReport);
+// Users
+router.get('/users',                      getAdminUsers);
+router.get('/users/:id',                  getAdminUser);
+router.patch('/users/:id/status',         patchAdminUserStatus);
+router.patch('/users/:id/role',           patchAdminUserRole);
+router.delete('/users/:id',               deleteAdminUser);
 
-// 4) GET /api/admin/users
-router.get('/users', getAdminUsers);
+// Activity logs
+router.get('/activity-logs',              getAdminActivityLogs);
 
 module.exports = router;
-
