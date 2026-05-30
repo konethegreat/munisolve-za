@@ -1,51 +1,21 @@
 // ==========================================
-// PUBLIC ROUTES (Placeholder)
+// PUBLIC ROUTES (no authentication required)
 // ==========================================
-// Defines public-facing endpoints (no authentication)
-// This is a placeholder - full implementation coming next
-// Author: MuniSolve ZA Development Team
+// Powers public-facing widgets using free, keyless data sources:
+//   GET /api/public/stats         -> aggregate community statistics
+//   GET /api/public/air-quality   -> live air quality (Open-Meteo)
+//   GET /api/public/holidays      -> SA public holidays (Nager.Date)
+// ==========================================
 
 const express = require('express');
 const router = express.Router();
 const { generalLimiter } = require('../middleware/rateLimit.middleware');
+const { getStats, getAirQuality, getHolidays } = require('../controllers/public.controller');
 
+router.use(generalLimiter);
 
-
-// ==========================================
-// PLACEHOLDER ROUTES
-// ==========================================
-// These are public - no authentication required
-
-/**
- * @route   GET /api/public/dashboard
- * @desc    Get public dashboard statistics
- * @access  Public
- */
-router.get('/dashboard', generalLimiter, (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Public dashboard endpoint - Coming soon',
-    data: {
-      totalReports: 0,
-      resolvedReports: 0,
-      pendingReports: 0,
-      municipalities: []
-    },
-    hint: 'Full dashboard statistics will be implemented next'
-  });
-});
-
-/**
- * @route   GET /api/public/municipalities
- * @desc    Get all municipalities
- * @access  Public
- */
-router.get('/municipalities', generalLimiter, (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Municipalities endpoint - Coming soon',
-    data: []
-  });
-});
+router.get('/stats', getStats);
+router.get('/air-quality', getAirQuality);
+router.get('/holidays', getHolidays);
 
 module.exports = router;

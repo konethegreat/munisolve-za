@@ -74,6 +74,8 @@ build/
 # PostgreSQL backup files
 *.sql
 *.dump
+# But always track Prisma migration files
+!**/prisma/migrations/**/*.sql
 
 # ==========================================
 # LOGS & DEBUGGING

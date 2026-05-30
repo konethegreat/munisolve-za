@@ -63,11 +63,13 @@ const authRoutes   = require('./routes/auth.routes');
 const reportRoutes = require('./routes/report.routes');
 const aiRoutes     = require('./routes/ai.routes');
 const adminRoutes  = require('./routes/admin.routes');
+const publicRoutes = require('./routes/public.routes');
 
 app.use('/api/auth',    authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/ai',      aiRoutes);
 app.use('/api/admin',   adminRoutes);
+app.use('/api/public',  publicRoutes);
 
 // --- SERVER START ---
 const PORT = process.env.PORT || 5000;

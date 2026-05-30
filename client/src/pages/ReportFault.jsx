@@ -8,6 +8,8 @@ import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import MunicipalitySelector from '../components/MunicipalitySelector';
+import AirQualityBadge from '../components/AirQualityBadge';
+import HolidayBanner from '../components/HolidayBanner';
 
 const NOMINATIM_HEADERS = {
   'User-Agent': 'MuniSolveZA/1.0 (erictshivhinda@gmail.com)',
@@ -267,11 +269,15 @@ export default function ReportFault() {
       <Navbar />
       <main className="flex-1 px-4 py-12">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-xl shadow-lg border-t-4 border-[#0d3b5c] p-8">
+          <div className="card animate-scale-in border-t-4 border-[#0d3b5c] p-8 shadow-lg">
             <h1 className="text-2xl font-bold text-[#0d3b5c] mb-2">Report a Fault</h1>
-            <p className="text-slate-600 text-sm mb-6">
+            <p className="text-slate-600 text-sm mb-4">
               Help us improve your community by reporting municipal service issues.
             </p>
+
+            <div className="mb-6">
+              <HolidayBanner />
+            </div>
 
             {success && (
               <div className="mb-6 bg-green-50 border border-green-200 rounded-md px-4 py-3">
@@ -387,7 +393,10 @@ export default function ReportFault() {
                 </button>
                 {/* Location status messages */}
                 {form.latitude !== null ? (
-                  <p className="mt-1 text-green-600 text-xs">📍 Location pinned successfully</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <p className="text-green-600 text-xs">📍 Location pinned successfully</p>
+                    <AirQualityBadge lat={form.latitude} lon={form.longitude} />
+                  </div>
                 ) : form.address.trim().length > 0 ? (
                   <p className="mt-1 text-amber-500 text-xs">⚠️ Select a suggestion to pin this location</p>
                 ) : null}

@@ -3,12 +3,14 @@
 // ==========================================
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FileText, Clock, Wrench, CheckCircle2, Plus, LogOut, RefreshCw } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ReportCard from '../components/ReportCard';
 import IncidentMap from '../components/IncidentMap';
+import AnimatedCounter from '../components/AnimatedCounter';
 
 // ==========================================
 // MAIN DASHBOARD COMPONENT
@@ -92,7 +94,7 @@ export default function Dashboard() {
           {/* ================================ */}
           {/* HEADER */}
           {/* ================================ */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4 animate-fade-up">
             <div>
               <h1 className="text-3xl font-bold text-[#0d3b5c]">
                 Welcome back, {user?.firstName}! 👋
@@ -104,15 +106,15 @@ export default function Dashboard() {
             <div className="flex gap-3">
               <button
                 onClick={() => navigate('/report')}
-                className="bg-[#1a5f3c] hover:bg-[#145230] text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                className="btn btn-accent btn-sheen py-2 px-4 text-sm"
               >
-                + New Report
+                <Plus size={16} /> New Report
               </button>
               <button
                 onClick={handleLogout}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                className="btn bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 px-4 text-sm"
               >
-                Logout
+                <LogOut size={16} /> Logout
               </button>
             </div>
           </div>
@@ -121,22 +123,34 @@ export default function Dashboard() {
           {/* STATS CARDS */}
           {/* ================================ */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 text-center">
-              <p className="text-3xl font-bold text-[#0d3b5c]">{stats.total}</p>
-              <p className="text-slate-500 text-sm mt-1">Total Reports</p>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 text-center">
-              <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
-              <p className="text-slate-500 text-sm mt-1">Pending</p>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 text-center">
-              <p className="text-3xl font-bold text-blue-600">{stats.inProgress}</p>
-              <p className="text-slate-500 text-sm mt-1">In Progress</p>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 text-center">
-              <p className="text-3xl font-bold text-green-600">{stats.resolved}</p>
-              <p className="text-slate-500 text-sm mt-1">Resolved</p>
-            </div>
+            {[
+              { label: 'Total Reports', value: stats.total, icon: FileText, color: '#0d3b5c' },
+              { label: 'Pending', value: stats.pending, icon: Clock, color: '#ca8a04' },
+              { label: 'In Progress', value: stats.inProgress, icon: Wrench, color: '#2563eb' },
+              { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: '#16a34a' },
+            ].map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <div
+                  key={s.label}
+                  className="card card-hover stat-card animate-fade-up p-5"
+                  style={{ '--edge': s.color, animationDelay: `${i * 0.07}s` }}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-3xl font-bold" style={{ color: s.color }}>
+                      {loading ? <span className="skeleton inline-block h-8 w-10 rounded align-middle" /> : <AnimatedCounter value={s.value} />}
+                    </p>
+                    <span
+                      className="flex h-10 w-10 items-center justify-center rounded-lg"
+                      style={{ backgroundColor: `${s.color}14`, color: s.color }}
+                    >
+                      <Icon size={20} />
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-sm mt-1">{s.label}</p>
+                </div>
+              );
+            })}
           </div>
 
           {/* ================================ */}
@@ -163,9 +177,9 @@ export default function Dashboard() {
               <h2 className="text-lg font-bold text-[#0d3b5c]">Your Reports</h2>
               <button
                 onClick={fetchReports}
-                className="text-sm text-[#0d3b5c] hover:underline"
+                className="flex items-center gap-1.5 text-sm text-[#0d3b5c] hover:underline"
               >
-                ↻ Refresh
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
               </button>
             </div>
 
@@ -189,9 +203,20 @@ export default function Dashboard() {
             {/* Report List */}
             <div className="p-6">
               {loading ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#0d3b5c] mx-auto mb-4"></div>
-                  <p className="text-slate-500">Loading your reports...</p>
+                <div className="space-y-4">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="rounded-xl border border-slate-100 p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="skeleton h-8 w-8 rounded-lg" />
+                        <div className="flex-1 space-y-2">
+                          <div className="skeleton h-4 w-1/2 rounded" />
+                          <div className="skeleton h-3 w-1/3 rounded" />
+                          <div className="skeleton h-3 w-2/3 rounded" />
+                        </div>
+                        <div className="skeleton h-6 w-20 rounded-full" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : error ? (
                 <div className="text-center py-12">

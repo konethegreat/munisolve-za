@@ -1,1 +1,298 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   MuniSolve ZA — Design Tokens & Interactive Layer
+   Brand palette is unchanged: navy #0d3b5c, gold #e8b923, green #1a5f3c.
+   This layer adds CSS variables, motion, and reusable interactive classes.
+   ========================================================================== */
+
+:root {
+  /* Brand colours (unchanged) */
+  --navy: #0d3b5c;
+  --navy-dark: #0a2d45;
+  --navy-soft: #14507a;
+  --gold: #e8b923;
+  --gold-soft: #f2cd4c;
+  --green: #1a5f3c;
+  --green-dark: #145230;
+
+  /* Neutrals */
+  --ink: #1e293b;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --surface: #ffffff;
+  --canvas: #f8fafc;
+
+  /* Effects */
+  --shadow-sm: 0 1px 2px rgba(13, 59, 92, 0.06), 0 1px 3px rgba(13, 59, 92, 0.08);
+  --shadow-md: 0 4px 12px rgba(13, 59, 92, 0.08), 0 2px 6px rgba(13, 59, 92, 0.06);
+  --shadow-lg: 0 18px 40px -12px rgba(13, 59, 92, 0.28);
+  --shadow-gold: 0 8px 24px -6px rgba(232, 185, 35, 0.45);
+  --ring: 0 0 0 3px rgba(13, 59, 92, 0.15);
+  --radius: 14px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* --------------------------------------------------------------------------
+   Custom scrollbar
+   -------------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c3d0db transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #b8c7d4, #9fb1c2);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--navy-soft); background-clip: content-box; }
+
+/* --------------------------------------------------------------------------
+   Keyframes
+   -------------------------------------------------------------------------- */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 185, 35, 0.5); }
+  50%      { box-shadow: 0 0 0 10px rgba(232, 185, 35, 0); }
+}
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes shimmer {
+  0%   { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
+}
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+@keyframes drawLine {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* --------------------------------------------------------------------------
+   Reusable animation utilities
+   -------------------------------------------------------------------------- */
+.animate-fade-up   { animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in   { animation: fadeIn 0.6s ease both; }
+.animate-scale-in  { animation: scaleIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-float     { animation: float 6s ease-in-out infinite; }
+.animate-pulse-glow{ animation: pulseGlow 2.4s ease-in-out infinite; }
+
+/* Stagger helpers */
+.delay-1 { animation-delay: 0.08s; }
+.delay-2 { animation-delay: 0.16s; }
+.delay-3 { animation-delay: 0.24s; }
+.delay-4 { animation-delay: 0.32s; }
+.delay-5 { animation-delay: 0.40s; }
+.delay-6 { animation-delay: 0.48s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Animated brand backgrounds
+   -------------------------------------------------------------------------- */
+.bg-brand-animated {
+  background: linear-gradient(120deg, var(--navy) 0%, var(--navy-soft) 45%, var(--green) 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 14s ease infinite;
+}
+
+.bg-mesh {
+  background-color: var(--canvas);
+  background-image:
+    radial-gradient(at 12% 18%, rgba(13, 59, 92, 0.10) 0px, transparent 45%),
+    radial-gradient(at 88% 8%, rgba(232, 185, 35, 0.12) 0px, transparent 40%),
+    radial-gradient(at 70% 92%, rgba(26, 95, 60, 0.10) 0px, transparent 45%);
+}
+
+/* Gold underline accent that draws in */
+.accent-underline {
+  height: 4px;
+  width: 96px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-soft));
+  transform-origin: left center;
+  animation: drawLine 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+/* Gradient text using brand colours */
+.text-gradient-brand {
+  background: linear-gradient(90deg, var(--navy), var(--green));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Cards & interactive surfaces
+   -------------------------------------------------------------------------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(13, 59, 92, 0.18);
+}
+
+/* Stat card with a coloured top edge that grows on hover */
+.stat-card {
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--edge, var(--navy));
+  transform: scaleX(0.4);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+.stat-card:hover::before { transform: scaleX(1); }
+
+/* Glass header bar */
+.glass {
+  background: rgba(13, 59, 92, 0.85);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+}
+
+/* --------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: transform 0.18s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  will-change: transform;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+.btn-primary { background: var(--navy); color: #fff; box-shadow: var(--shadow-md); }
+.btn-primary:hover { background: var(--navy-dark); box-shadow: var(--shadow-lg); }
+.btn-accent { background: var(--green); color: #fff; box-shadow: var(--shadow-md); }
+.btn-accent:hover { background: var(--green-dark); }
+.btn-gold { background: var(--gold); color: var(--navy); box-shadow: var(--shadow-gold); }
+.btn-gold:hover { background: var(--gold-soft); }
+
+/* Sheen sweep on hover for prominent buttons */
+.btn-sheen { overflow: hidden; }
+.btn-sheen::after {
+  content: "";
+  position: absolute;
+  top: 0; left: -120%;
+  width: 60%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+}
+.btn-sheen:hover::after { left: 140%; }
+
+/* --------------------------------------------------------------------------
+   Inputs
+   -------------------------------------------------------------------------- */
+.input-field {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  background: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+}
+.input-field:focus {
+  border-color: var(--navy);
+  box-shadow: var(--ring);
+}
+
+/* --------------------------------------------------------------------------
+   Skeleton loaders
+   -------------------------------------------------------------------------- */
+.skeleton {
+  background: #eef2f6;
+  background-image: linear-gradient(90deg, #eef2f6 0px, #f7fafc 40px, #eef2f6 80px);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Map polish (leaflet popups + controls)
+   -------------------------------------------------------------------------- */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-lg) !important;
+  border: 1px solid var(--line);
+}
+.leaflet-container { font-family: inherit; }
+.leaflet-bar a {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.leaflet-bar a:hover { background: var(--navy) !important; color: #fff !important; }
+
+/* Pulsing dot used for "live" indicators */
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulseGlow 2s ease-out infinite;
+}
