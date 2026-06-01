@@ -35,8 +35,20 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// AI chat limiter: 30 messages per hour, keyed by authenticated user ID.
+// AI calls are expensive — do not use generalLimiter on these routes.
+const aiChatLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => String(req.user?.id ?? req.ip),
+  message: { success: false, message: 'You have reached your AI chat limit. Please try again in an hour.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   authLimiter,
   passwordResetLimiter,
   generalLimiter,
+  aiChatLimiter,
 };

@@ -5,14 +5,11 @@ const express = require('express');
 const router = express.Router();
 const { chat } = require('../controllers/ai.controller');
 const { authenticate } = require('../middleware/auth.middleware');
-const { generalLimiter } = require('../middleware/rateLimit.middleware');
+const { aiChatLimiter } = require('../middleware/rateLimit.middleware');
 
-
-
-
-// All AI routes require authentication
-router.use(generalLimiter);
+// Authenticate first so the rate limiter can key by user ID, not just IP
 router.use(authenticate);
+router.use(aiChatLimiter);
 
 /**
  * @route  POST /api/ai/chat
