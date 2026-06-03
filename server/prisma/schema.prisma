@@ -38,23 +38,39 @@ model ActivityLog {
   createdAt   DateTime @default(now())
 }
 
+model Team {
+  id             Int      @id @default(autoincrement())
+  name           String
+  specialization String
+  municipality   String?
+  latitude       Float?
+  longitude      Float?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  reports        Report[]
+}
+
 model Report {
-  id              Int      @id @default(autoincrement())
-  title           String
-  description     String
-  category        String
-  municipality    String
-  address         String?
-  latitude        Float?
-  longitude       Float?
-  status          String   @default("PENDING")
+  id               Int       @id @default(autoincrement())
+  title            String
+  description      String
+  category         String
+  municipality     String
+  address          String?
+  latitude         Float?
+  longitude        Float?
+  status           String    @default("PENDING")
   weatherTemp      Float?
-weatherCondition String?
-weatherRainfall  Float?
-weatherWind      Float?
-weatherHumidity  Float?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  userId          Int
-  user            User     @relation(fields: [userId], references: [id])
+  weatherCondition String?
+  weatherRainfall  Float?
+  weatherWind      Float?
+  weatherHumidity  Float?
+  assignedTeamId   Int?
+  team             Team?     @relation(fields: [assignedTeamId], references: [id])
+  assignedAt       DateTime?
+  afterPhotoUrl    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  userId           Int
+  user             User      @relation(fields: [userId], references: [id])
 }

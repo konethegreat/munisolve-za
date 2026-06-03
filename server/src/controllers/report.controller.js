@@ -147,7 +147,7 @@ const updateStatus = async (req, res) => {
     const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(userRole);
 
     // Valid statuses
-    const validStatuses = ['PENDING', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'];
+    const validStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED', 'CLOSED'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,

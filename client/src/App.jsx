@@ -5,6 +5,7 @@ import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
+import SupervisorRoute from './components/SupervisorRoute';
 import ReportDetail from './pages/ReportDetail';
 
 // Pages
@@ -16,6 +17,7 @@ import Dashboard from './pages/Dashboard';
 import ReportFault from './pages/ReportFault';
 import MapPage from './pages/MapPage';
 import Admin from './pages/Admin';
+import SupervisorDashboard from './pages/SupervisorDashboard';
 
 function App() {
   return (
@@ -59,6 +61,14 @@ function App() {
             <AdminRoute>
               <Admin />
             </AdminRoute>
+          }
+        />
+        <Route
+          path="/supervisor"
+          element={
+            <SupervisorRoute>
+              <SupervisorDashboard />
+            </SupervisorRoute>
           }
         />
       </Routes>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LayoutDashboard, LogIn, UserPlus, Shield } from 'lucide-react'
+import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LayoutDashboard, LogIn, UserPlus, Shield, HardHat } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 const NAV_LINKS = [
@@ -15,6 +15,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const { isAuthenticated, user } = useAuth()
   const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(user?.role)
+  const isSupervisor = ['WORKER_SUPERVISOR', 'MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(user?.role)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -57,6 +58,16 @@ export default function Navbar() {
                 <LayoutDashboard size={18} />
                 Dashboard
               </NavLink>
+            )}
+            {isAuthenticated && isSupervisor && (
+              <Link
+                to="/supervisor"
+                className="flex items-center gap-1.5 bg-white/10 hover:bg-[#1a5f3c] hover:text-white text-white/90 rounded-md px-3 py-2 text-sm transition-colors"
+                aria-label="Supervisor Dashboard"
+              >
+                <HardHat size={16} className="opacity-90" />
+                Ops
+              </Link>
             )}
             {isAuthenticated && isAdmin && (
               <Link
@@ -128,6 +139,17 @@ export default function Navbar() {
                   <LayoutDashboard size={18} />
                   Dashboard
                 </NavLink>
+              )}
+              {isAuthenticated && isSupervisor && (
+                <Link
+                  to="/supervisor"
+                  className="flex items-center gap-2 px-4 py-3 bg-[#1a5f3c] text-white rounded-md mx-2 font-semibold shadow-sm"
+                  onClick={() => setOpen(false)}
+                  aria-label="Supervisor Dashboard"
+                >
+                  <HardHat size={18} className="opacity-90" />
+                  Ops Dashboard
+                </Link>
               )}
               {isAuthenticated && isAdmin && (
                 <Link

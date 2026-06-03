@@ -1,7 +1,7 @@
 const prisma = require('../config/db.config');
 
-const VALID_REPORT_STATUSES = ['PENDING', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'];
-const VALID_ROLES = ['CITIZEN', 'MUNICIPAL_ADMIN', 'SUPER_ADMIN'];
+const VALID_REPORT_STATUSES = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED', 'CLOSED'];
+const VALID_ROLES = ['CITIZEN', 'MUNICIPAL_ADMIN', 'SUPER_ADMIN', 'WORKER_SUPERVISOR'];
 
 // ── Reports ────────────────────────────────────────────────────────────────
 

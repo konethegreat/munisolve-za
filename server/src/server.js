@@ -59,17 +59,19 @@ app.get('/health', (req, res) => {
 });
 
 // --- ROUTES ---
-const authRoutes   = require('./routes/auth.routes');
-const reportRoutes = require('./routes/report.routes');
-const aiRoutes     = require('./routes/ai.routes');
-const adminRoutes  = require('./routes/admin.routes');
-const publicRoutes = require('./routes/public.routes');
+const authRoutes       = require('./routes/auth.routes');
+const reportRoutes     = require('./routes/report.routes');
+const aiRoutes         = require('./routes/ai.routes');
+const adminRoutes      = require('./routes/admin.routes');
+const publicRoutes     = require('./routes/public.routes');
+const supervisorRoutes = require('./routes/supervisor.routes');
 
-app.use('/api/auth',    authRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/ai',      aiRoutes);
-app.use('/api/admin',   adminRoutes);
-app.use('/api/public',  publicRoutes);
+app.use('/api/auth',       authRoutes);
+app.use('/api/reports',    reportRoutes);
+app.use('/api/ai',         aiRoutes);
+app.use('/api/admin',      adminRoutes);
+app.use('/api/public',     publicRoutes);
+app.use('/api/supervisor', supervisorRoutes);
 
 // --- SERVER START ---
 const PORT = process.env.PORT || 5000;
