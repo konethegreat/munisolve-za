@@ -16,13 +16,15 @@ model User {
   lastName   String
   googleId      String?  @unique
   phone      String?
-  role       String   @default("CITIZEN")
-  isActive   Boolean  @default(true)
-  isVerified Boolean  @default(false)
-  lastLogin  DateTime?
-  createdAt  DateTime @default(now())
-  reports      Report[]
-  activityLogs ActivityLog[]
+  role              String    @default("CITIZEN")
+  isActive          Boolean   @default(true)
+  isVerified        Boolean   @default(false)
+  lastLogin         DateTime?
+  emailVerifToken   String?
+  emailVerifExpiry  DateTime?
+  createdAt         DateTime  @default(now())
+  reports           Report[]
+  activityLogs      ActivityLog[]
 }
 
 model ActivityLog {

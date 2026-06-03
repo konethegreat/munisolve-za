@@ -1,69 +1,41 @@
-// ==========================================
-// AUTHENTICATION ROUTES
-// ==========================================
 const express = require('express');
 const router = express.Router();
 
-
-// Import controllers
 const {
   register,
   login,
+  googleLogin,
+  sendVerificationOtp,
+  verifyEmail,
   getCurrentUser,
   logout,
-  googleLogin
 } = require('../controllers/auth.controller');
 
-// Import middleware
 const { authenticate } = require('../middleware/auth.middleware');
 const {
   validateRegistration,
   validateLogin,
-  handleValidationErrors
+  handleValidationErrors,
 } = require('../middleware/validation.middleware');
-const { authLimiter, passwordResetLimiter } = require('../middleware/rateLimit.middleware');
+const { authLimiter, passwordResetLimiter, emailVerifLimiter } = require('../middleware/rateLimit.middleware');
 
-// ==========================================
-// PUBLIC ROUTES
-// ==========================================
-router.post('/register', authLimiter, validateRegistration, handleValidationErrors, register);
-router.post('/login',    authLimiter, validateLogin,        handleValidationErrors, login);
+// ── Public ─────────────────────────────────────────────────────────────────
+router.post('/register',           authLimiter,       validateRegistration, handleValidationErrors, register);
+router.post('/login',              authLimiter,       validateLogin,        handleValidationErrors, login);
+router.post('/google',             authLimiter,       googleLogin);
+router.post('/send-verification',  emailVerifLimiter, sendVerificationOtp);
+router.post('/verify-email',       emailVerifLimiter, verifyEmail);
 
-// ==========================================
-// PROTECTED ROUTES
-// ==========================================
-router.get('/me',       authenticate, getCurrentUser);
-router.post('/logout',  authenticate, logout);
-//router.post('/google', googleLogin);
+// ── Protected ──────────────────────────────────────────────────────────────
+router.get('/me',      authenticate, getCurrentUser);
+router.post('/logout', authenticate, logout);
 
-// ==========================================
-// FUTURE ROUTES (Placeholders)
-// ==========================================
+// ── Placeholders ───────────────────────────────────────────────────────────
 router.post('/forgot-password', passwordResetLimiter, (req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Password reset feature coming soon',
-    errorCode: 'NOT_IMPLEMENTED'
-  });
+  res.status(501).json({ success: false, message: 'Password reset coming soon', errorCode: 'NOT_IMPLEMENTED' });
 });
-
 router.post('/reset-password', (req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Password reset feature coming soon',
-    errorCode: 'NOT_IMPLEMENTED'
-  });
+  res.status(501).json({ success: false, message: 'Password reset coming soon', errorCode: 'NOT_IMPLEMENTED' });
 });
-
-router.post('/verify-email', (req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Email verification feature coming soon',
-    errorCode: 'NOT_IMPLEMENTED'
-  });
-});
-
-
-
 
 module.exports = router;

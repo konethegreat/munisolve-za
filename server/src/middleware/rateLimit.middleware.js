@@ -46,9 +46,19 @@ const aiChatLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Email verification OTP: 5 sends per hour per IP to prevent abuse
+const emailVerifLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many verification requests. Please wait an hour and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   authLimiter,
   passwordResetLimiter,
   generalLimiter,
   aiChatLimiter,
+  emailVerifLimiter,
 };

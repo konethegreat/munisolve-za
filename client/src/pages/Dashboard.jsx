@@ -2,8 +2,8 @@
 // DASHBOARD PAGE - FULLY FUNCTIONAL
 // ==========================================
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FileText, Clock, Wrench, CheckCircle2, Plus, LogOut, RefreshCw } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { FileText, Clock, Wrench, CheckCircle2, Plus, LogOut, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import Navbar from '../components/Navbar';
@@ -85,9 +85,40 @@ export default function Dashboard() {
   // ==========================================
   // RENDER
   // ==========================================
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const showVerifyBanner = !user?.isVerified && !bannerDismissed;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <Navbar />
+
+      {/* Email verification banner */}
+      {showVerifyBanner && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-amber-800 text-sm">
+              <ShieldAlert size={16} className="shrink-0 text-amber-600" />
+              <span>
+                <strong>Verify your email</strong> to unlock all features.{' '}
+                <Link
+                  to="/verify-email"
+                  className="underline font-semibold hover:text-amber-900"
+                >
+                  Enter your code
+                </Link>
+              </span>
+            </div>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              className="shrink-0 text-amber-600 hover:text-amber-800 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 px-4 py-10">
         <div className="max-w-5xl mx-auto space-y-8">
 

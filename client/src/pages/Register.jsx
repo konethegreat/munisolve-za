@@ -33,8 +33,8 @@ export default function Register() {
     
     try {
       await register(form);
-      // Auto-login successful, redirect to dashboard
-      navigate('/dashboard', { replace: true });
+      // Redirect to email verification — pass email via router state
+      navigate('/verify-email', { state: { email: form.email }, replace: true });
     } catch (err) {
       const msg =
         err.response?.data?.message ||

@@ -131,6 +131,11 @@ export function AuthProvider({ children }) {
   }
 };
 
+  // Patch the in-memory user object (e.g. after email verification)
+  const updateUser = (updatedFields) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : prev));
+  };
+
   // Check if user is authenticated
   const isAuthenticated = !!token && !!user;
 
@@ -143,6 +148,7 @@ export function AuthProvider({ children }) {
     register,
     logout,
     googleLogin,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

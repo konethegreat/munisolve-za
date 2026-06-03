@@ -18,6 +18,7 @@ import ReportFault from './pages/ReportFault';
 import MapPage from './pages/MapPage';
 import Admin from './pages/Admin';
 import SupervisorDashboard from './pages/SupervisorDashboard';
+import VerifyEmail from './pages/VerifyEmail';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/reports/:id" element={<ProtectedRoute><ReportDetail /></ProtectedRoute>} />
 
         {/* Protected Routes - Require Authentication */}
