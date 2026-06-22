@@ -6,33 +6,42 @@
 // Last Updated: February 2026
 
 const { PrismaClient } = require('@prisma/client');
+const { withRetry } = require('./retry');
 
 // Initialize Prisma Client
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' 
+const basePrisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development'
     ? ['query', 'error', 'warn']
     : ['error'],
   errorFormat: 'pretty',
 });
 
-// Graceful shutdown handlers
-process.on('SIGINT', async () => {
-  console.log('\n[DATABASE] Closing database connections...');
-  await prisma.$disconnect();
-  console.log('[DATABASE] Database connections closed');
-  process.exit(0);
+// Wrap every query so transient connection drops (e.g. Neon compute
+// auto-suspend, which terminates idle connections with Postgres 57P01) are
+// retried transparently instead of surfacing as user-facing 500s. Lifecycle
+// methods ($connect/$disconnect) stay on the base client below.
+const prisma = basePrisma.$extends({
+  query: {
+    async $allOperations({ args, query }) {
+      return withRetry(() => query(args));
+    },
+  },
 });
 
-process.on('SIGTERM', async () => {
-  console.log('\n[DATABASE] Closing database connections...');
-  await prisma.$disconnect();
+// Graceful shutdown handlers
+async function shutdown(signal) {
+  console.log(`\n[DATABASE] ${signal} received — closing database connections...`);
+  await basePrisma.$disconnect();
   console.log('[DATABASE] Database connections closed');
   process.exit(0);
-});
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Test connection in development
 if (process.env.NODE_ENV === 'development') {
-  prisma.$connect()
+  basePrisma.$connect()
     .then(() => {
       console.log('✅ Database connected successfully');
     })
@@ -43,5 +52,5 @@ if (process.env.NODE_ENV === 'development') {
     });
 }
 
-// Export Prisma Client
+// Export the extended Prisma Client (transparent retry on connection drops)
 module.exports = prisma;
