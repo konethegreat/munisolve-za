@@ -31,13 +31,6 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function formatDate(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('en-ZA', {
-    year: 'numeric', month: 'short', day: 'numeric',
-  });
-}
-
 const STATUS_META = {
   PENDING:     { label: 'Pending',     bg: 'bg-amber-100',   text: 'text-amber-800' },
   ASSIGNED:    { label: 'Assigned',    bg: 'bg-blue-100',    text: 'text-blue-800' },
