@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test",
+    "demo": "node scripts/demo.js",
+    "demo:verify": "node scripts/demo.js --verify",
     "dev": "nodemon src/server.js",
     "postinstall": "prisma generate",
     "prisma": "prisma",

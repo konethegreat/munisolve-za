@@ -5,6 +5,7 @@
 // Author: MuniSolve ZA Security Team
 
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = rateLimit;
 
 // Auth routes: 5 attempts per 15 minutes (register/login)
 const authLimiter = rateLimit({
@@ -20,7 +21,7 @@ const authLimiter = rateLimit({
 const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
-  keyGenerator: (req) => String(req.user?.id ?? req.ip),
+  keyGenerator: (req) => req.user?.id != null ? `user:${req.user.id}` : ipKeyGenerator(req.ip),
   message: { success: false, message: 'Too many password reset requests.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -40,7 +41,7 @@ const generalLimiter = rateLimit({
 const aiChatLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 30,
-  keyGenerator: (req) => String(req.user?.id ?? req.ip),
+  keyGenerator: (req) => req.user?.id != null ? `user:${req.user.id}` : ipKeyGenerator(req.ip),
   message: { success: false, message: 'You have reached your AI chat limit. Please try again in an hour.' },
   standardHeaders: true,
   legacyHeaders: false,

@@ -58,6 +58,7 @@ export default function Login() {
             <p className="text-slate-600 text-sm mb-6">Sign in to your MuniSolve ZA account.</p>
 
             {/* Google Sign-In */}
+            {import.meta.env.VITE_GOOGLE_CLIENT_ID && <>
             <div className="flex justify-center mb-5">
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
@@ -81,6 +82,8 @@ export default function Login() {
                 </span>
               </div>
             </div>
+
+            </>}
 
             {/* Email / password form */}
             <form onSubmit={handleSubmit} className="space-y-4">

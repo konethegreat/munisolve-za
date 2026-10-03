@@ -53,6 +53,8 @@ async function startApp() {
 
   process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = TEST_JWT_SECRET;
+  // Only the stub sees this synthetic value; the real SDK is replaced below.
+  process.env.ANTHROPIC_API_KEY = 'synthetic-test-only';
   process.env.CLIENT_URL = `${TEST_CLIENT_ORIGIN}/`;
   delete process.env.JWT_EXPIRES_IN;
 

@@ -21,15 +21,19 @@ function categoryIcon(category) {
 function StatusBadge({ status }) {
   const styles = {
     PENDING:     'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    ASSIGNED:    'bg-indigo-100 text-indigo-800 border border-indigo-200',
     IN_PROGRESS: 'bg-blue-100 text-blue-800 border border-blue-200',
     RESOLVED:    'bg-green-100 text-green-800 border border-green-200',
     REJECTED:    'bg-red-100 text-red-800 border border-red-200',
+    CLOSED:      'bg-slate-100 text-slate-700 border border-slate-200',
   };
   const labels = {
     PENDING:     '⏳ Pending',
+    ASSIGNED:    '👷 Assigned',
     IN_PROGRESS: '🔧 In Progress',
     RESOLVED:    '✅ Resolved',
     REJECTED:    '❌ Rejected',
+    CLOSED:      '✓ Closed',
   };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status] || styles.PENDING}`}>

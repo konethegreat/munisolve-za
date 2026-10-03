@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# The AI prompt sanitizer uses escaped control characters; review it as source.
+server/src/controllers/ai.controller.js text diff

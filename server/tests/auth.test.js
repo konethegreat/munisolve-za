@@ -307,4 +307,15 @@ describe('authentication', () => {
       assert.equal(res.body.errorCode, 'NOT_IMPLEMENTED');
     }
   });
+
+  test('password-reset limits group IPv6 addresses in the same subnet', async () => {
+    for (let suffix = 1; suffix <= 3; suffix += 1) {
+      const res = await h.api('POST', '/api/auth/forgot-password', { ip: `2001:db8:1234:5600::${suffix}` });
+      assert.equal(res.status, 501);
+    }
+    const blocked = await h.api('POST', '/api/auth/forgot-password', { ip: '2001:db8:1234:5600::4' });
+    assert.equal(blocked.status, 429);
+    const otherSubnet = await h.api('POST', '/api/auth/forgot-password', { ip: '2001:db8:1234:5700::1' });
+    assert.equal(otherSubnet.status, 501);
+  });
 });
