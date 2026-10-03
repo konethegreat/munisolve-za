@@ -10,8 +10,8 @@
 // Safety rails:
 //   - refuses to run unless DATABASE_URL points at this machine (localhost,
 //     127.0.0.1 or ::1) and NODE_ENV is not "production"
-//   - no password is stored in the repo: pass DEMO_PASSWORD (12+ characters),
-//     otherwise a random one is generated and printed once
+//   - no password is stored in the repo or printed by the script: you choose
+//     one with DEMO_PASSWORD (12+ characters)
 //   - every row is synthetic: example.com addresses and made-up street names
 //   - idempotent: running it again updates the same rows in place (and resets
 //     the four demo reports to the status they start with)
@@ -20,7 +20,6 @@
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 
-const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
@@ -124,15 +123,12 @@ function assertLocalOnly() {
   }
 }
 
-function resolvePassword() {
-  const provided = process.env.DEMO_PASSWORD;
-  if (provided) {
-    if (provided.length < MIN_PASSWORD_LENGTH) {
-      throw new Error(`DEMO_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-    }
-    return { password: provided, generated: false };
+function requirePassword() {
+  const password = process.env.DEMO_PASSWORD || '';
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`Set DEMO_PASSWORD (at least ${MIN_PASSWORD_LENGTH} characters): the password every demo account will use.`);
   }
-  return { password: crypto.randomBytes(12).toString('base64url'), generated: true };
+  return password;
 }
 
 async function upsertUsers(prisma, hashedPassword) {
@@ -185,7 +181,7 @@ async function ensureReports(prisma, users, teams) {
 
 async function main() {
   assertLocalOnly();
-  const { password, generated } = resolvePassword();
+  const password = requirePassword();
 
   // Loaded after the safety check: in development this module connects as soon as it is required.
   const prisma = require('../src/config/db.config');
@@ -202,11 +198,7 @@ async function main() {
   console.log('Demo data ready on the local database:');
   for (const u of DEMO_USERS) console.log(`  ${u.email.padEnd(30)} ${u.role}`);
   console.log(`  ${DEMO_TEAMS.length} teams, ${DEMO_REPORTS.length} reports`);
-  console.log(
-    generated
-      ? `Generated password for every demo account (shown once): ${password}`
-      : 'Every demo account uses the DEMO_PASSWORD you supplied.'
-  );
+  console.log('Every demo account uses the DEMO_PASSWORD you supplied.');
 }
 
 main().catch((err) => {
