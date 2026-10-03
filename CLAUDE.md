@@ -10,7 +10,7 @@ MuniSolve ZA is a South African civic-tech platform. Citizens report municipal i
 
 **Owner:** Kone Tshivhinda — Full-Stack Developer, Johannesburg, SA  
 **Email:** erictshivhinda@gmail.com  
-**Status:** Production-deployed, portfolio project.
+**Status:** Portfolio project with a reproducible local synthetic workflow. Hosted deployment and provider behavior are not verified by that demonstration. See `docs/DEMO.md` for current evidence and limitations.
 
 ---
 
@@ -104,9 +104,9 @@ munisolve-za/
 
 | | |
 |---|---|
-| **Node.js** | 18+ |
-| **Express** | 4.x |
-| **Prisma** | 6.x (see server/package.json) |
+| **Node.js** | 22.12+ (CI uses Node 22) |
+| **Express** | 5.x |
+| **Prisma** | 6.x (see server/package.json; the adapter-pg package is not used by the current client configuration) |
 | **Database** | PostgreSQL via Neon (serverless) |
 | **React** | 19.2 |
 | **Vite** | 7.x |
@@ -351,6 +351,15 @@ VITE_GOOGLE_CLIENT_ID=     # Same value as server GOOGLE_CLIENT_ID — needed by
 ---
 
 ## Development Commands
+
+The repeatable demo uses a new PostgreSQL 16 Docker container and clears provider
+credentials. From the repo root, run `npm --prefix server ci` and
+`npm --prefix client ci`, then `npm --prefix server run demo:verify` for the 34-step
+real HTTP/PostgreSQL check. For the browser demo, set a temporary `DEMO_PASSWORD`
+of at least 12 characters and run `npm --prefix server run demo`. Ctrl+C removes
+its own database and processes. See `docs/DEMO.md` for the four synthetic accounts.
+AI and email clients are optional at startup; without a key, AI chat returns 503
+after ownership validation and report submission returns `aiResponse: null`.
 
 ```bash
 # Backend

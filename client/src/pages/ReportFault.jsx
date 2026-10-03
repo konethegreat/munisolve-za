@@ -134,6 +134,14 @@ export default function ReportFault() {
     skipAddressSearchRef.current = true;
   }, []);
 
+  const useDemoLocation = () => {
+    skipAddressSearchRef.current = true;
+    setAddressSuggestions([]);
+    setError('');
+    setForm((prev) => ({ ...prev, address: 'Fictional Lane (synthetic demo address)',
+      latitude: -26.2051, longitude: 28.0483 }));
+  };
+
   const handleUseCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser.');
@@ -392,6 +400,12 @@ export default function ReportFault() {
                   {locationLoading ? 'Getting location...' : 'Use my current location'}
                 </button>
                 {/* Location status messages */}
+                {import.meta.env.VITE_DEMO_MODE === 'true' && (
+                  <button type="button" onClick={useDemoLocation}
+                    className="mt-2 ml-4 text-sm text-[#0d3b5c] hover:underline font-medium">
+                    Use fictional demo location
+                  </button>
+                )}
                 {form.latitude !== null ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <p className="text-green-600 text-xs">📍 Location pinned successfully</p>

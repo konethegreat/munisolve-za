@@ -12,7 +12,7 @@ import SiyandaChat from '../components/SiyandaChat';
 // ==========================================
 // STATUS TIMELINE
 // ==========================================
-const STEPS = ['PENDING', 'IN_PROGRESS', 'RESOLVED'];
+const STEPS = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
 function StatusTimeline({ status }) {
   const isRejected = status === 'REJECTED';
@@ -45,8 +45,8 @@ function StatusTimeline({ status }) {
                 <div className={`absolute h-0.5 top-4 transition-all duration-500
                   ${isDone ? 'bg-[#1a5f3c]' : 'bg-slate-200'}`}
                   style={{
-                    left: `${(i - 1) * 50 + 25}%`,
-                    width: '50%',
+                    left: `${(i - 0.5) * (100 / STEPS.length)}%`,
+                    width: `${100 / STEPS.length}%`,
                   }}
                 />
               )}
@@ -65,8 +65,10 @@ function StatusTimeline({ status }) {
                 ${isDone ? 'text-[#1a5f3c]' : 'text-slate-400'}
               `}>
                 {step === 'PENDING' && '⏳ Pending'}
+                {step === 'ASSIGNED' && '👷 Assigned'}
                 {step === 'IN_PROGRESS' && '🔧 In Progress'}
                 {step === 'RESOLVED' && '✅ Resolved'}
+                {step === 'CLOSED' && '✓ Closed'}
               </p>
             </div>
           );

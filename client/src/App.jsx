@@ -23,6 +23,11 @@ import VerifyEmail from './pages/VerifyEmail';
 function App() {
   return (
     <AuthProvider>
+      {import.meta.env.VITE_DEMO_MODE === 'true' && (
+        <div role="status" className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
+          Local demo · fictional data · no real municipal submissions
+        </div>
+      )}
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />

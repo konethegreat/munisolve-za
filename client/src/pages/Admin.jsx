@@ -7,8 +7,11 @@ import WeatherBadge from '../components/WeatherBadge';
 
 const REPORT_STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending' },
+  { value: 'ASSIGNED', label: 'Assigned' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'RESOLVED', label: 'Resolved' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'CLOSED', label: 'Closed' },
 ];
 
 function formatDate(value) {
@@ -277,9 +280,9 @@ export default function Admin() {
                       className="w-full sm:w-44 text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white outline-none focus:border-[#0d3b5c]"
                     >
                       <option value="ALL">All statuses</option>
-                      <option value="PENDING">Pending</option>
-                      <option value="IN_PROGRESS">In Progress</option>
-                      <option value="RESOLVED">Resolved</option>
+                      {REPORT_STATUS_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
                     </select>
                     <select
                       value={reportWeatherFilter}
@@ -353,7 +356,7 @@ export default function Admin() {
                             <tr key={r.id} className="text-slate-800 align-top">
                               <td className="py-4 pr-4">
                                 <div className="font-medium">
-                                  {r.user?.name || '—'}
+                                  {r.user?.name || [r.user?.firstName, r.user?.lastName].filter(Boolean).join(' ') || '—'}
                                 </div>
                                 <div className="text-xs text-slate-400">
                                   {r.user?.email || ''}

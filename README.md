@@ -1,190 +1,94 @@
 # MuniSolve ZA
 
-**Enterprise Municipal Service Delivery Platform for South Africa**
+A South African civic-tech portfolio project by **Kone Tshivhinda**. Citizens report infrastructure faults and track their reports; supervisors assign crews and record progress; municipal administrators manage reports and users.
 
-MuniSolve ZA is a full-stack civic-tech platform that bridges the gap between South African citizens and local government. Citizens can report infrastructure failures and utility outages, track resolution progress in real time, and get instant guidance from an AI assistant — while municipal administrators manage reports, users, and activity through a secure back-office dashboard.
+**Try the [synthetic local walkthrough](docs/DEMO.md).** It runs the actual React interface, Express API and PostgreSQL database with fictional accounts, without requiring AI, email, weather or Google credentials.
 
----
+![Citizen report progress in the synthetic local demo](docs/images/citizen-pending.png)
 
-## Tech Stack
+## Demonstrated features
+
+- Citizen fault submission with category, municipality and a map location.
+- Own-report access: another citizen cannot open, edit or delete a report.
+- Supervisor triage, crew suggestions, assignment, progress and resolution.
+- A required after-photo URL on the supervisor resolution endpoint.
+- Municipal admin report and user management, with an activity-log API.
+- JWT authentication, bcrypt passwords, current database role/account checks, Helmet headers, CORS and rate limits.
+- Optional Siyanda (Anthropic), Resend email verification, Google sign-in and weather integrations; public map, holiday and air-quality widgets.
+
+The reproducible path is `PENDING → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED`.
+This is a demonstrated workflow, not a strict state machine enforced by every endpoint. Admin endpoints allow direct status changes; citizens may confirm their own pending or in-progress reports as resolved.
+
+## Stack
 
 | Layer | Technology |
 |---|---|
-| **Runtime** | Node.js 18+ · Express.js |
-| **Database** | PostgreSQL (Neon Serverless) · Prisma ORM |
-| **Frontend** | React 19 · Vite · Tailwind CSS 4 |
-| **Routing** | React Router v7 |
-| **Mapping** | Leaflet · React-Leaflet · leaflet.heat |
-| **AI** | Anthropic Claude (Siyanda assistant) |
-| **Auth** | JWT · bcrypt · Google OAuth 2.0 |
-| **HTTP Client** | Axios (interceptors, base URL config) |
-| **Security** | Helmet.js · express-rate-limit · CORS |
-| **Deployment** | Vercel (frontend) · Render (backend) · Neon (database) |
+| Runtime | Node.js 22.12+; Express 5 |
+| Data | PostgreSQL; Prisma 6 |
+| Interface | React 19; Vite 7; Tailwind CSS 4; React Router 7 |
+| Maps | Leaflet; React Leaflet; OpenStreetMap |
+| Optional providers | Anthropic; Resend; Google OAuth; WeatherAPI |
 
----
+## Reproduce the workflow
 
-## Features
+Install Node.js 22.12+ and Docker, then:
 
-### Citizen Portal
-- **Fault Reporting** — Submit geo-tagged reports with title, description, category, municipality, and street address. Weather conditions (temperature, rainfall, wind, humidity) are automatically embedded at submission time.
-- **Report Dashboard** — Citizens see only their own reports with live status badges: `PENDING` → `IN_PROGRESS` → `RESOLVED`.
-- **Incident Map** — Interactive Leaflet heatmap showing all active incidents across municipalities. Clickable markers link to full report details.
-- **Siyanda AI Chat** — Per-report conversational assistant powered by Anthropic Claude. Guides citizens through the reporting process, explains municipal procedures, and validates input. Rate-limited to 30 messages per hour per user.
-- **Live Public Widgets** — Landing page shows real-time community stats, air quality (Open-Meteo), and upcoming South African public holidays (Nager.Date API) — all without authentication.
-
-### Admin Back-Office
-- **Dashboard** — Aggregate statistics: total reports, open incidents, resolved count, registered users.
-- **Report Management** — View all reports across all municipalities, update statuses, and delete invalid submissions.
-- **User Management** — View all registered users, activate/deactivate accounts, promote or demote roles (`CITIZEN` → `ADMIN` → `SUPERADMIN`).
-- **Activity Logs** — Full audit trail of all significant system events (registrations, logins, report submissions) with IP address and user-agent capture.
-
-### Security Architecture
-- **JWT Authentication** — Stateless, 24-hour expiring tokens. Middleware validates every protected route.
-- **Role-Based Access Control** — Three-tier permission model: `CITIZEN`, `ADMIN`, `SUPERADMIN`. Admin routes enforce `requireAdmin` middleware.
-- **Rate Limiting** — Layered limits: 5 auth attempts per 15 min (brute-force protection), 100 API calls per 15 min (general), 30 AI chat messages per hour (cost control). Auth limiter skips successful requests.
-- **Password Security** — bcrypt with 12 salt rounds.
-- **Security Headers** — Helmet.js enforces CSP, HSTS, X-Frame-Options, and XSS protection.
-- **CORS** — Strict origin allowlist matching Vercel deployment URL and local dev.
-
----
-
-## Data Models
-
-```
-User
-├── id, email (unique), password (hashed)
-├── firstName, lastName, phone?
-├── googleId? (OAuth)
-├── role: CITIZEN | ADMIN | SUPERADMIN
-├── isActive, isVerified, lastLogin
-└── relations: reports[], activityLogs[]
-
-Report
-├── id, title, description, category
-├── municipality, address?, latitude?, longitude?
-├── status: PENDING | IN_PROGRESS | RESOLVED
-├── weatherTemp?, weatherCondition?, weatherRainfall?
-├── weatherWind?, weatherHumidity?
-└── relation: user
-
-ActivityLog
-├── id, userId, action, entity, entityId
-├── description?, ipAddress?, userAgent?
-└── relation: user
-```
-
----
-
-## API Reference
-
-### Auth — `/api/auth`
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `POST` | `/register` | Public | Register with email + password |
-| `POST` | `/login` | Public | Login, returns JWT |
-| `GET` | `/me` | Private | Get authenticated user profile |
-
-### Reports — `/api/reports`
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `POST` | `/` | Private | Submit a new fault report |
-| `GET` | `/` | Private | List reports (citizen: own; admin: all) |
-| `GET` | `/:id` | Private | Get a single report |
-| `PUT` | `/:id` | Private | Edit a report |
-| `PATCH` | `/:id/status` | Private | Update report status |
-| `DELETE` | `/:id` | Private | Delete a report |
-
-### AI — `/api/ai`
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `POST` | `/chat` | Private | Chat with Siyanda (body: `reportId`, `message`, `history[]`) |
-
-### Admin — `/api/admin`
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `GET` | `/dashboard` | Admin | Aggregate platform statistics |
-| `GET` | `/reports` | Admin | All reports |
-| `GET` | `/reports/:id` | Admin | Single report detail |
-| `PATCH` | `/reports/:id/status` | Admin | Update report status |
-| `DELETE` | `/reports/:id` | Admin | Delete report |
-| `GET` | `/users` | Admin | All users |
-| `GET` | `/users/:id` | Admin | Single user detail |
-| `PATCH` | `/users/:id/status` | Admin | Activate / deactivate user |
-| `PATCH` | `/users/:id/role` | Admin | Change user role |
-| `DELETE` | `/users/:id` | Admin | Delete user |
-| `GET` | `/activity-logs` | Admin | Full audit log |
-
-### Public — `/api/public`
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `GET` | `/stats` | Public | Aggregate community statistics |
-| `GET` | `/air-quality` | Public | Live air quality index (Open-Meteo) |
-| `GET` | `/holidays` | Public | Upcoming SA public holidays (Nager.Date) |
-
----
-
-## Local Development
-
-**Prerequisites:** Node.js 18+, PostgreSQL or a Neon database URL.
-
-```bash
-# 1. Clone
+```sh
 git clone https://github.com/konethegreat/munisolve-za.git
 cd munisolve-za
-
-# 2. Backend
-cd server
-npm install
-cp .env.example .env          # fill in DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY, CLIENT_URL
-npx prisma migrate dev
-npm run dev
-
-# 3. Frontend (new terminal)
-cd client
-npm install
-cp .env.example .env          # fill in VITE_API_URL
-npm run dev
+npm --prefix server ci
+npm --prefix client ci
+npm --prefix server run demo:verify
 ```
 
-Frontend runs on `http://localhost:5173`, backend on `http://localhost:5000`.
+Verification creates a new PostgreSQL 16 container, seeds four fictional users and two crews, starts the real API, checks 34 HTTP steps, and removes its processes and database. It checks permissions, every lifecycle state, missing-photo rejection, keyless reporting and audit history. Credentials are generated per run and are not saved to files or printed.
 
----
+For the interactive interface, set a temporary `DEMO_PASSWORD` of at least 12 characters and run `npm --prefix server run demo`. The launcher prints a local login URL. [The walkthrough](docs/DEMO.md) has shell commands, accounts, expected results and screenshots. Stop with Ctrl+C to discard that database.
 
-## Deployment
+## Checks
 
-| Service | Purpose | URL |
-|---|---|---|
-| **Vercel** | React frontend | Production |
-| **Render** | Express API | Production |
-| **Neon** | PostgreSQL (serverless) | Production |
+```sh
+npm --prefix server test
+npm --prefix server run demo:verify
+npm --prefix client run lint
+npm --prefix client run build
+```
 
-Environment variables required on Render: `DATABASE_URL`, `JWT_SECRET`, `ANTHROPIC_API_KEY`, `CLIENT_URL`.  
-Environment variables required on Vercel: `VITE_API_URL`.
+GitHub Actions runs API tests with stubbed external dependencies, the actual PostgreSQL HTTP workflow, and client lint/build. The browser walkthrough is a separate manual check; CI does not automate the UI.
 
----
+## Regular local development
 
-## Project Status
+Use your own development PostgreSQL database and untracked `server/.env` with `DATABASE_URL`, a random `JWT_SECRET`, `CLIENT_URL=http://localhost:5173` and `NODE_ENV=development`. Provider credentials are optional for basic reporting: without them AI chat is unavailable and email verification cannot deliver mail.
 
-| Component | Status |
+```sh
+npm --prefix server run db:push
+npm --prefix server run dev
+```
+
+In another terminal, run `npm --prefix client run dev`. The client defaults to `http://localhost:5000/api`; use `VITE_API_URL` to change it. Configure `VITE_GOOGLE_CLIENT_ID` and matching server `GOOGLE_CLIENT_ID` to enable Google sign-in. The current schema is managed with `prisma db push`; hosted databases do not have synchronized migration history.
+
+## Roles and API entry points
+
+| Role | Demonstrated access |
 |---|---|
-| API & Database | Production |
-| Authentication & RBAC | Production |
-| Fault Reporting | Production |
-| Siyanda AI Chat | Production |
-| Admin Dashboard | Production |
-| Interactive Map | Production |
-| Public Widgets | Production |
+| `CITIZEN` | Own reports; no admin or supervisor endpoints |
+| `WORKER_SUPERVISOR` | Operational reports and crews through `/api/supervisor`; no admin endpoints |
+| `MUNICIPAL_ADMIN` | Admin and supervisor endpoints |
+| `SUPER_ADMIN` | Admin and supervisor endpoints |
 
----
+Auth: `/api/auth`; citizen reports: `/api/reports`; operations: `/api/supervisor`; administration: `/api/admin`; chat: `/api/ai`; public widgets: `/api/public`. `/health` checks API availability. Audit records are available through `/api/admin/activity-logs`; the current admin interface has reports and users tabs.
+
+## Evidence and limits
+
+[Demo evidence](docs/DEMO.md#recorded-evidence) covers a local synthetic workflow. It does not verify the hosted Vercel/Render/Neon deployment, real municipal receipt or repairs, AI answers, email delivery or Google OAuth. The photo field stores a URL; the demo uses a placeholder rather than a verified upload. Status updates are seen after navigation or refresh. Municipal admins currently have global report visibility; municipality names are not tenant isolation.
+
+Dependency advisories observed during this demonstration are follow-up work; passing workflow tests are not a clean security audit.
 
 ## Developer
 
-**Kone Tshivhinda** — Full-Stack Developer, Johannesburg, South Africa
+**Kone Tshivhinda** — Full-stack developer, Johannesburg, South Africa.
 
 - [LinkedIn](https://za.linkedin.com/in/kone-tshivhinda-32a760233)
-- [erictshivhinda@gmail.com](mailto:erictshivhinda@gmail.com)
-- Open to Full-Stack, Backend, or Security-focused roles
+- [Email](mailto:erictshivhinda@gmail.com)
 
----
-
-© 2026 Kone Tshivhinda. All rights reserved. Proprietary software — for portfolio evaluation.
+© 2026 Kone Tshivhinda. All rights reserved. Proprietary software for portfolio evaluation.
