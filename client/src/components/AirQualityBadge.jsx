@@ -8,20 +8,23 @@ import { Wind } from 'lucide-react';
 import { fetchAirQuality } from '../api/publicApi';
 
 export default function AirQualityBadge({ lat, lon, compact = false }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // The result is stored with the coordinates it was fetched for, so "loading" can be worked out
+  // while rendering (no result for the current coordinates yet) instead of being set in the effect.
+  const key = lat == null || lon == null ? null : `${lat},${lon}`;
+  const [result, setResult] = useState({ key: null, data: null });
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (key === null) return;
     let active = true;
-    if (lat == null || lon == null) return;
-    setLoading(true);
     fetchAirQuality(lat, lon)
-      .then((res) => { if (active) setData(res); })
-      .catch(() => {})
-      .finally(() => { if (active) setLoading(false); });
+      .then((res) => { if (active) setResult({ key, data: res }); })
+      .catch(() => { if (active) setResult((prev) => ({ key, data: prev.data })); });
     return () => { active = false; };
-  }, [lat, lon]);
+  }, [key, lat, lon]);
+
+  const { data } = result;
+  const loading = key !== null && result.key !== key;
 
   if (lat == null || lon == null) return null;
 
