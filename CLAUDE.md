@@ -367,7 +367,7 @@ cd server
 npm install
 npx prisma db push          # sync schema to Neon (DO NOT use prisma migrate dev)
 npx prisma studio           # visual DB browser
-npm run dev                 # nodemon watch
+npm run dev                 # Node built-in watch mode
 
 # Frontend
 cd client
