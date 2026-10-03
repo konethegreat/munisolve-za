@@ -18,8 +18,6 @@
 //
 // Never point this at the hosted database or at the live deployment.
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
-
 const bcrypt = require('bcryptjs');
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
@@ -201,7 +199,14 @@ async function main() {
   console.log('Every demo account uses the DEMO_PASSWORD you supplied.');
 }
 
-main().catch((err) => {
-  console.error('Demo seed failed:', err.message);
-  process.exitCode = 1;
-});
+// The safety checks are exported so tests can exercise them without touching a database.
+module.exports = { assertLocalOnly, requirePassword };
+
+if (require.main === module) {
+  require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+
+  main().catch((err) => {
+    console.error('Demo seed failed:', err.message);
+    process.exitCode = 1;
+  });
+}

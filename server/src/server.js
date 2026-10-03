@@ -74,8 +74,14 @@ app.use('/api/public',     publicRoutes);
 app.use('/api/supervisor', supervisorRoutes);
 
 // --- SERVER START ---
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server heart beating on: http://localhost:${PORT}`);
-  console.log(`🔒 Security layers (Helmet/RateLimit) Active`);
-});
+// Listen only when run directly (npm start / node src/server.js). The tests
+// require() the app instead, so importing this file never opens a port.
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server heart beating on: http://localhost:${PORT}`);
+    console.log(`🔒 Security layers (Helmet/RateLimit) Active`);
+  });
+}
+
+module.exports = app;
