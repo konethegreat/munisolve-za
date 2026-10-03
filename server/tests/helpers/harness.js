@@ -13,15 +13,18 @@
 
 const Module = require('node:module');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createFakePrisma } = require('./fakePrisma');
 
 const SERVER_ROOT = path.resolve(__dirname, '..', '..');
 
-// Synthetic values that exist only inside the test process.
-const TEST_JWT_SECRET = 'test-only-jwt-secret-not-used-anywhere-else';
-const TEST_PASSWORD = 'Test#Passw0rd!';
+// Generated for this test process only, so no reusable credential lives in the source. The suffix
+// keeps the password valid under the registration rules (upper case, lower case, digit, symbol).
+const TEST_JWT_SECRET = crypto.randomBytes(32).toString('hex');
+const TEST_PASSWORD = `${crypto.randomBytes(12).toString('hex')}Aa1!`;
+const WRONG_PASSWORD = `${crypto.randomBytes(12).toString('hex')}Bb2?`;
 const TEST_CLIENT_ORIGIN = 'https://client.example.test';
 
 // Cost 4 keeps the suite fast; the app's bcrypt.compare works with any cost.
@@ -189,8 +192,9 @@ async function startApp() {
     weather,
     secret: TEST_JWT_SECRET,
     password: TEST_PASSWORD,
+    wrongPassword: WRONG_PASSWORD,
     clientOrigin: TEST_CLIENT_ORIGIN,
   };
 }
 
-module.exports = { startApp, TEST_JWT_SECRET, TEST_PASSWORD };
+module.exports = { startApp, TEST_JWT_SECRET, TEST_PASSWORD, WRONG_PASSWORD };

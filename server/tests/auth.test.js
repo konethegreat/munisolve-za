@@ -4,7 +4,7 @@ const { describe, test, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
-const { startApp } = require('./helpers/harness');
+const { startApp, TEST_PASSWORD } = require('./helpers/harness');
 
 describe('authentication', () => {
   let h;
@@ -46,7 +46,7 @@ describe('authentication', () => {
     test('answers a wrong password and an unknown email identically', async () => {
       const user = h.makeUser();
 
-      const wrongPassword = await login(user.email, 'Wrong#Passw0rd9');
+      const wrongPassword = await login(user.email, h.wrongPassword);
       const unknownEmail = await login('nobody@example.com', h.password);
 
       assert.equal(wrongPassword.status, 401);
@@ -79,10 +79,10 @@ describe('authentication', () => {
       const ip = '203.0.113.7'; // documentation address (TEST-NET-3)
 
       for (let attempt = 1; attempt <= 5; attempt += 1) {
-        assert.equal((await login(user.email, 'Wrong#Passw0rd9', ip)).status, 401);
+        assert.equal((await login(user.email, h.wrongPassword, ip)).status, 401);
       }
 
-      assert.equal((await login(user.email, 'Wrong#Passw0rd9', ip)).status, 429);
+      assert.equal((await login(user.email, h.wrongPassword, ip)).status, 429);
       assert.equal((await login(user.email, h.password, ip)).status, 429);
     });
 
@@ -101,7 +101,7 @@ describe('authentication', () => {
       firstName: 'Thandi',
       lastName: 'Demo',
       email: 'new.person@example.com',
-      password: 'Str0ng#Passw0rd',
+      password: TEST_PASSWORD,
       phone: '0821234567',
     };
 
@@ -174,7 +174,7 @@ describe('authentication', () => {
           firstName: 'Thandi',
           lastName: 'Demo',
           email: 'verify.me@example.com',
-          password: 'Str0ng#Passw0rd',
+          password: TEST_PASSWORD,
         },
       });
       return h.email.sent[0][2];
@@ -246,7 +246,7 @@ describe('authentication', () => {
         ['no header', {}, 'NO_TOKEN'],
         ['wrong scheme', { headers: { authorization: 'Token abc' } }, 'INVALID_TOKEN_FORMAT'],
         ['garbage', { token: 'not.a.jwt' }, 'INVALID_TOKEN'],
-        ['another secret', { token: h.tokenFor(user, { secret: 'some-other-secret' }) }, 'INVALID_TOKEN'],
+        ['another secret', { token: h.tokenFor(user, { secret: crypto.randomBytes(32).toString('hex') }) }, 'INVALID_TOKEN'],
         ['unsigned (alg none)', { token: `${header}.${payload}.` }, 'INVALID_TOKEN'],
         ['expired', { token: h.tokenFor(user, { expiresIn: -60 }) }, 'TOKEN_EXPIRED'],
       ];

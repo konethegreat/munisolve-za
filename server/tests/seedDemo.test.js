@@ -5,6 +5,7 @@
 
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const { assertLocalOnly, requirePassword } = require('../prisma/seedDemo');
 
 const ENV_KEYS = ['DATABASE_URL', 'NODE_ENV', 'DEMO_PASSWORD'];
@@ -85,7 +86,8 @@ describe('demo seed safety checks', () => {
     process.env.DEMO_PASSWORD = 'too-short';
     assert.throws(() => requirePassword(), /at least 12/);
 
-    process.env.DEMO_PASSWORD = 'a-long-enough-passphrase';
-    assert.equal(requirePassword(), 'a-long-enough-passphrase');
+    const longEnough = crypto.randomBytes(12).toString('hex');
+    process.env.DEMO_PASSWORD = longEnough;
+    assert.equal(requirePassword(), longEnough);
   });
 });
