@@ -15,7 +15,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seedAdmin.js"
+    "db:seed": "node prisma/seedAdmin.js",
+    "db:seed:demo": "node prisma/seedDemo.js"
   },
   "keywords": [],
   "author": "",
