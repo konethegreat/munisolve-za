@@ -31,6 +31,13 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// A triage report created more than 24 hours ago is flagged as overdue.
+const OVERDUE_AFTER_MS = 24 * 3600000;
+
+function isOverdue(dateStr) {
+  return Date.now() - new Date(dateStr).getTime() > OVERDUE_AFTER_MS;
+}
+
 const STATUS_META = {
   PENDING:     { label: 'Pending',     bg: 'bg-amber-100',   text: 'text-amber-800' },
   ASSIGNED:    { label: 'Assigned',    bg: 'bg-blue-100',    text: 'text-blue-800' },
@@ -471,9 +478,7 @@ function CreateTeamModal({ onClose, onCreated }) {
 // ─── Report Card (triage queue) ───────────────────────────────────────────────
 
 function TriageCard({ report, onSelect }) {
-  const ageMs = Date.now() - new Date(report.createdAt).getTime();
-  const ageHrs = ageMs / 3600000;
-  const urgent = ageHrs > 24;
+  const urgent = isOverdue(report.createdAt);
 
   return (
     <button
