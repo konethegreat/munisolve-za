@@ -586,36 +586,42 @@ export default function SupervisorDashboard() {
   const [statusTarget, setStatusTarget] = useState(null);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
 
-  const fetchAll = useCallback(async () => {
-    setLoadingTriage(true);
-    setLoadingActive(true);
-    setLoadingTeams(true);
-
-    const [dashRes, triageRes, activeRes, teamsRes] = await Promise.allSettled([
+  const fetchAll = useCallback(
+    () => Promise.allSettled([
       api.get('/supervisor/dashboard'),
       api.get('/supervisor/reports/triage'),
       api.get('/supervisor/reports/active'),
       api.get('/supervisor/teams'),
-    ]);
+    ]).then(([dashRes, triageRes, activeRes, teamsRes]) => {
+      if (dashRes.status === 'fulfilled' && dashRes.value.data.success) {
+        setStats(dashRes.value.data.data);
+      }
+      if (triageRes.status === 'fulfilled' && triageRes.value.data.success) {
+        setTriageReports(triageRes.value.data.data);
+      }
+      setLoadingTriage(false);
 
-    if (dashRes.status === 'fulfilled' && dashRes.value.data.success) {
-      setStats(dashRes.value.data.data);
-    }
-    if (triageRes.status === 'fulfilled' && triageRes.value.data.success) {
-      setTriageReports(triageRes.value.data.data);
-    }
-    setLoadingTriage(false);
+      if (activeRes.status === 'fulfilled' && activeRes.value.data.success) {
+        setActiveReports(activeRes.value.data.data);
+      }
+      setLoadingActive(false);
 
-    if (activeRes.status === 'fulfilled' && activeRes.value.data.success) {
-      setActiveReports(activeRes.value.data.data);
-    }
-    setLoadingActive(false);
+      if (teamsRes.status === 'fulfilled' && teamsRes.value.data.success) {
+        setTeams(teamsRes.value.data.data);
+      }
+      setLoadingTeams(false);
+    }),
+    [],
+  );
 
-    if (teamsRes.status === 'fulfilled' && teamsRes.value.data.success) {
-      setTeams(teamsRes.value.data.data);
-    }
-    setLoadingTeams(false);
-  }, []);
+  // The loading flags start as true, so the first load only has to fetch. A manual refresh turns
+  // them back on first, from the click handler rather than from inside the effect.
+  const refresh = () => {
+    setLoadingTriage(true);
+    setLoadingActive(true);
+    setLoadingTeams(true);
+    fetchAll();
+  };
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -676,7 +682,7 @@ export default function SupervisorDashboard() {
               </div>
             </div>
             <button
-              onClick={fetchAll}
+              onClick={refresh}
               className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-sm transition-colors"
             >
               <RefreshCw size={14} />
