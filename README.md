@@ -48,13 +48,15 @@ For the interactive interface, set a temporary `DEMO_PASSWORD` of at least 12 ch
 ## Checks
 
 ```sh
+npm --prefix server audit --audit-level=low
+npm --prefix client audit --audit-level=low
 npm --prefix server test
 npm --prefix server run demo:verify
 npm --prefix client run lint
 npm --prefix client run build
 ```
 
-GitHub Actions runs API tests with stubbed external dependencies, the actual PostgreSQL HTTP workflow, and client lint/build. The browser walkthrough is a separate manual check; CI does not automate the UI.
+GitHub Actions runs both dependency audits, API tests with stubbed external dependencies, the actual PostgreSQL HTTP workflow, and client lint/build. Audits include development dependencies and fail on findings of any severity. The browser walkthrough is a separate manual check; CI does not automate the UI.
 
 ## Regular local development
 
@@ -66,6 +68,8 @@ npm --prefix server run dev
 ```
 
 In another terminal, run `npm --prefix client run dev`. The client defaults to `http://localhost:5000/api`; use `VITE_API_URL` to change it. Configure `VITE_GOOGLE_CLIENT_ID` and matching server `GOOGLE_CLIENT_ID` to enable Google sign-in. The current schema is managed with `prisma db push`; hosted databases do not have synchronized migration history.
+
+The server uses Node's built-in watch mode to restart when imported source files change. Restart it manually after changing environment variables or the Prisma schema.
 
 ## Roles and API entry points
 
@@ -82,7 +86,7 @@ Auth: `/api/auth`; citizen reports: `/api/reports`; operations: `/api/supervisor
 
 [Demo evidence](docs/DEMO.md#recorded-evidence) covers a local synthetic workflow. It does not verify the hosted Vercel/Render/Neon deployment, real municipal receipt or repairs, AI answers, email delivery or Google OAuth. The photo field stores a URL; the demo uses a placeholder rather than a verified upload. Status updates are seen after navigation or refresh. Municipal admins currently have global report visibility; municipality names are not tenant isolation.
 
-Dependency advisories observed during this demonstration are follow-up work; passing workflow tests are not a clean security audit.
+The October 3, 2026 dependency refresh reduced the server and client npm audit results from 17 findings each to zero. [Dependency maintenance notes](docs/DEPENDENCIES.md) explain the Prisma override and how to reproduce the checks. This records known npm advisories on that date; workflow tests and dependency audits do not establish complete application security.
 
 ## Developer
 

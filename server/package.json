@@ -8,7 +8,7 @@
     "test": "node --test",
     "demo": "node scripts/demo.js",
     "demo:verify": "node scripts/demo.js --verify",
-    "dev": "nodemon src/server.js",
+    "dev": "node --watch src/server.js",
     "postinstall": "prisma generate",
     "prisma": "prisma",
     "db:generate": "prisma generate",
@@ -24,11 +24,12 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
-    "@prisma/adapter-pg": "^7.4.0",
-    "@prisma/client": "^6.19.2",
-    "bcrypt": "^6.0.0",
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -38,14 +39,17 @@
     "google-auth-library": "^10.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "pg": "^8.18.0",
-    "prisma": "^6.19.2",
+    "prisma": "^6.19.3",
     "resend": "^6.12.4"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
-    "nodemon": "^3.1.11",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    }
   }
 }
