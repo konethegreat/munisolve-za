@@ -9,6 +9,7 @@ const { httpLogger } = require('./logger');
 const { notFound } = require('./middleware/notFound.middleware');
 const { errorHandler } = require('./middleware/error.middleware');
 const { generalLimiter } = require('./middleware/rateLimit.middleware');
+const { liveness, readiness } = require('./controllers/health.controller');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -41,21 +42,16 @@ app.use(cors({
 // 3. JSON Parser
 app.use(express.json());
 
-// 4. One global API limiter
-app.use('/api/', generalLimiter);
-
 // --- HEALTH CHECK ---
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.send('<h1>MuniSolve ZA Backend is Live!</h1><p>Go to /health to check status.</p>');
 });
 
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'Success',
-    message: 'MuniSolve ZA API is running smoothly',
-    timestamp: new Date().toISOString()
-  });
-});
+app.get('/health', liveness);
+app.get('/ready', readiness);
+
+// 4. One global API limiter
+app.use('/api/', generalLimiter);
 
 // --- ROUTES ---
 const authRoutes       = require('./routes/auth.routes');
