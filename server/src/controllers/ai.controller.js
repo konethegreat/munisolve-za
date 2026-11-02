@@ -6,14 +6,11 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const prisma = require('../config/db.config');
+const { AppError } = require('../errors/AppError');
 
 const client = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
-
-const MAX_MESSAGE_LENGTH = 2000;
-const MAX_HISTORY_MESSAGES = 20;
-const ALLOWED_HISTORY_ROLES = new Set(['user', 'assistant']);
 
 // Strip control characters and cap length before embedding into the system prompt.
 // This prevents a crafted report field from injecting instructions into the prompt.
@@ -100,69 +97,38 @@ IMPORTANT RULES:
 // CHAT ENDPOINT
 // ==========================================
 const chat = async (req, res) => {
-  try {
-    const { reportId, message, history = [] } = req.body;
-    const userId = req.user.id;
+  const { reportId, message, history } = req.validated.body;
+  const userId = req.user.id;
 
-    if (!reportId || !message) {
-      return res.status(400).json({
-        success: false,
-        message: 'reportId and message are required',
-      });
-    }
+  const report = await prisma.report.findFirst({
+    where: {
+      id: reportId,
+      userId,
+    },
+  });
 
-    if (typeof message !== 'string' || message.trim().length === 0) {
-      return res.status(400).json({ success: false, message: 'Message must be a non-empty string.' });
-    }
+  if (!report) throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found');
 
-    if (message.length > MAX_MESSAGE_LENGTH) {
-      return res.status(400).json({
-        success: false,
-        message: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.`,
-      });
-    }
-
-    if (!Array.isArray(history)) {
-      return res.status(400).json({ success: false, message: 'history must be an array.' });
-    }
-
-    // Keep only the last N messages, enforce allowed roles, and cap content length.
-    // This prevents injecting system-level messages or sending unbounded token payloads.
-    const sanitizedHistory = history
-      .slice(-MAX_HISTORY_MESSAGES)
-      .filter((msg) => ALLOWED_HISTORY_ROLES.has(msg?.role) && typeof msg?.content === 'string')
-      .map((msg) => ({ role: msg.role, content: msg.content.slice(0, MAX_MESSAGE_LENGTH) }));
-
-    const report = await prisma.report.findFirst({
-      where: {
-        id: parseInt(reportId),
-        userId,
-      },
+  if (!client) {
+    return res.status(503).json({
+      success: false,
+      message: 'Siyanda is unavailable right now. Your report can still be tracked here.',
+      errorCode: 'AI_UNAVAILABLE',
     });
+  }
 
-    if (!report) {
-      return res.status(404).json({
-        success: false,
-        message: 'Report not found',
-      });
-    }
+  // The schema is the sole authority on history: roles, lengths and the 20-message
+  // cap are already enforced, so the validated array is sent as-is.
+  const messages = [
+    ...history,
+    {
+      role: 'user',
+      content: message,
+    },
+  ];
 
-    if (!client) {
-      return res.status(503).json({
-        success: false,
-        message: 'Siyanda is unavailable right now. Your report can still be tracked here.',
-        errorCode: 'AI_UNAVAILABLE',
-      });
-    }
-
-    const messages = [
-      ...sanitizedHistory,
-      {
-        role: 'user',
-        content: message.trim(),
-      },
-    ];
-
+  let aiMessage;
+  try {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
@@ -170,39 +136,37 @@ const chat = async (req, res) => {
       messages,
     });
 
-    const aiMessage = response.content[0].text;
-
-    await prisma.activityLog.create({
-      data: {
-        userId,
-        action: 'AI_CHAT',
-        entity: 'Report',
-        entityId: report.id,
-        description: `AI chat on report #${report.id}`,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-      },
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        message: aiMessage,
-        reportId: report.id,
-      },
-    });
-
+    aiMessage = response.content[0].text;
   } catch (error) {
+    // Only the model call has a fallback: the citizen still gets a human answer,
+    // and no internal detail (or debug field) leaks to the caller.
     console.error('[AI ERROR]', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Siyanda is unavailable right now. Please try again shortly.',
-      ...(process.env.NODE_ENV === 'development' && {
-        debug: error.message,
-      }),
     });
   }
+
+  await prisma.activityLog.create({
+    data: {
+      userId,
+      action: 'AI_CHAT',
+      entity: 'Report',
+      entityId: report.id,
+      description: `AI chat on report #${report.id}`,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      message: aiMessage,
+      reportId: report.id,
+    },
+  });
 };
 
 // ==========================================

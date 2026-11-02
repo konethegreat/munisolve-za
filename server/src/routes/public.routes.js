@@ -9,10 +9,12 @@
 
 const express = require('express');
 const router = express.Router();
+const { validate } = require('../middleware/validate');
+const { airQualityQuerySchema } = require('../schemas/public');
 const { getStats, getAirQuality, getHolidays } = require('../controllers/public.controller');
 
 router.get('/stats', getStats);
-router.get('/air-quality', getAirQuality);
+router.get('/air-quality', validate({ query: airQualityQuerySchema }), getAirQuality);
 router.get('/holidays', getHolidays);
 
 module.exports = router;
