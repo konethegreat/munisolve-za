@@ -10,7 +10,7 @@
 // logs, and the cascade of a deleted report's status history. These were checked against Prisma 6.19
 // and PostgreSQL while writing the tests.
 
-const MODELS = ['user', 'report', 'team', 'activityLog', 'reportStatusHistory'];
+const MODELS = ['user', 'report', 'team', 'activityLog', 'reportStatusHistory', 'slaPolicy', 'notificationOutbox'];
 
 const REQUIRED = {
   user: ['email', 'password', 'firstName', 'lastName'],
@@ -18,6 +18,8 @@ const REQUIRED = {
   team: ['name', 'specialization'],
   activityLog: ['userId', 'action', 'entity', 'entityId'],
   reportStatusHistory: ['reportId', 'toStatus'],
+  slaPolicy: ['category', 'responseMinutes', 'resolutionMinutes'],
+  notificationOutbox: ['dedupeKey', 'kind', 'recipientEmail', 'subject', 'body'],
 };
 
 const RELATIONS = {
@@ -27,9 +29,12 @@ const RELATIONS = {
     user: { model: 'user', fk: 'userId', many: false },
     team: { model: 'team', fk: 'assignedTeamId', many: false },
     history: { model: 'reportStatusHistory', fk: 'reportId', many: true },
+    notifications: { model: 'notificationOutbox', fk: 'reportId', many: true },
   },
   activityLog: { user: { model: 'user', fk: 'userId', many: false } },
   reportStatusHistory: { report: { model: 'report', fk: 'reportId', many: false } },
+  notificationOutbox: { report: { model: 'report', fk: 'reportId', many: false } },
+  slaPolicy: {},
 };
 
 const DEFAULTS = {
@@ -59,6 +64,9 @@ const DEFAULTS = {
     resolvedAt: null,
     closedAt: null,
     reopenCount: 0,
+    responseDueAt: null,
+    resolutionDueAt: null,
+    slaCycleStartedAt: null,
   }),
   team: () => ({ municipality: null, latitude: null, longitude: null, isActive: true }),
   activityLog: () => ({ description: null, ipAddress: null, userAgent: null, requestId: null }),
@@ -68,6 +76,16 @@ const DEFAULTS = {
     actorRole: null,
     note: null,
     requestId: null,
+  }),
+  slaPolicy: () => ({ isActive: true }),
+  notificationOutbox: () => ({
+    reportId: null,
+    status: 'PENDING',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: null,
+    sentAt: null,
+    lastError: null,
   }),
 };
 
@@ -96,6 +114,12 @@ function matches(row, where = {}) {
     }
     if (condition !== null && typeof condition === 'object' && !(condition instanceof Date)) {
       if (Array.isArray(condition.in)) return condition.in.includes(value);
+      if (Array.isArray(condition.notIn)) return !condition.notIn.includes(value);
+      if ('lt' in condition) return value != null && value < condition.lt;
+      if ('lte' in condition) return value != null && value <= condition.lte;
+      if ('gt' in condition) return value != null && value > condition.gt;
+      if ('gte' in condition) return value != null && value >= condition.gte;
+      if ('not' in condition) return value !== condition.not;
       if (typeof condition.contains === 'string') {
         const haystack = String(value ?? '');
         return condition.mode === 'insensitive'
@@ -165,6 +189,17 @@ function createFakePrisma() {
     }
     if (model === 'user' && tables.user.some((u) => u.email === data.email)) {
       throw prismaError('P2002', 'Unique constraint failed on the fields: (`email`)');
+    }
+    if (model === 'slaPolicy' && tables.slaPolicy.some((row) => row.category === data.category)) {
+      throw prismaError('P2002', 'Unique constraint failed on the fields: (`category`)');
+    }
+    if (model === 'notificationOutbox' && tables.notificationOutbox.some((row) => row.dedupeKey === data.dedupeKey)) {
+      throw prismaError('P2002', 'Unique constraint failed on the fields: (`dedupeKey`)');
+    }
+    if (model === 'notificationOutbox' && data.reportId != null) {
+      if (!tables.report.some((r) => r.id === data.reportId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `reportId`');
+      }
     }
     if (model === 'report' || model === 'activityLog') {
       if (!tables.user.some((u) => u.id === data.userId)) {
@@ -243,7 +278,14 @@ function createFakePrisma() {
     return out;
   }
 
-  function find(model, where) {
+  function find(model, where = {}) {
+    if (Array.isArray(where.OR)) {
+      const { OR, ...rest } = where;
+      const branches = OR.flatMap((branch) => find(model, branch));
+      const base = Object.keys(rest).length > 0 ? new Set(find(model, rest)) : null;
+      const unique = new Map(branches.map((row) => [row.id, row]));
+      return [...unique.values()].filter((row) => !base || base.has(row));
+    }
     return tables[model].filter((row) => matches(row, where));
   }
 
@@ -298,6 +340,21 @@ function createFakePrisma() {
       async create({ data, ...projection }) {
         return project(model, insert(model, data), projection);
       },
+      async createMany({ data, skipDuplicates = false } = {}) {
+        let count = 0;
+        for (const item of data) {
+          if (
+            skipDuplicates &&
+            model === 'notificationOutbox' &&
+            tables.notificationOutbox.some((row) => row.dedupeKey === item.dedupeKey)
+          ) {
+            continue;
+          }
+          insert(model, item);
+          count += 1;
+        }
+        return { count };
+      },
       async update({ where, data, ...projection }) {
         const row = requireOne(model, where);
         applyData(model, row, data);
@@ -324,6 +381,7 @@ function createFakePrisma() {
         }
         if (model === 'report') {
           tables.reportStatusHistory = tables.reportStatusHistory.filter((history) => history.reportId !== row.id);
+          tables.notificationOutbox = tables.notificationOutbox.filter((notice) => notice.reportId !== row.id);
         }
         tables[model] = tables[model].filter((r) => r !== row);
         return project(model, row);
