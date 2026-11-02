@@ -5,6 +5,7 @@ const prisma = require('../config/db.config');
 const { AppError } = require('../errors/AppError');
 const { generateAutoResponse } = require('./ai.controller');
 const { getWeatherForLocation } = require('../services/weather.service');
+const { transitionReport } = require('../services/report.service');
 
 const createReport = async (req, res) => {
   const { title, description, category, municipality, address, latitude, longitude } = req.validated.body;
@@ -123,82 +124,23 @@ const getReportById = async (req, res) => {
  *   RESOLVED    → IN_PROGRESS (re-open if citizen disputes)
  */
 const updateStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, note } = req.body;
-    const userId = req.user.id;
-    const userRole = req.user.role;
-    const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(userRole);
+  const { id } = req.validated.params;
+  const { status, note } = req.validated.body;
 
-    // Valid statuses
-    const validStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED', 'CLOSED'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
-      });
-    }
+  const updated = await transitionReport({
+    reportId: id,
+    actor: { id: req.user.id, role: req.user.role },
+    nextStatus: status,
+    note,
+    requestId: req.id,
+    source: 'reports',
+  });
 
-    // Find the report
-    const report = await prisma.report.findFirst({
-      where: isAdmin ? { id: parseInt(id) } : { id: parseInt(id), userId },
-    });
-
-    if (!report) {
-      return res.status(404).json({ success: false, message: 'Report not found' });
-    }
-
-    // Citizen permission check
-    if (!isAdmin) {
-      const allowedForCitizen = ['RESOLVED'];
-      if (!allowedForCitizen.includes(status)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Citizens can only mark reports as Resolved.',
-          errorCode: 'INSUFFICIENT_PERMISSIONS',
-        });
-      }
-      if (!['PENDING', 'IN_PROGRESS'].includes(report.status)) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot change status from ${report.status} to ${status}.`,
-        });
-      }
-    }
-
-    // Update the report status
-    const updated = await prisma.report.update({
-      where: { id: parseInt(id) },
-      data: { status },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-    });
-
-    // Log activity
-    await prisma.activityLog.create({
-      data: {
-        userId,
-        action: 'UPDATE_STATUS',
-        entity: 'Report',
-        entityId: updated.id,
-        description: `Status changed from ${report.status} → ${status}${note ? `: ${note}` : ''}`,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-      },
-    });
-
-    console.log(`[REPORT] Status updated: #${id} ${report.status} → ${status} by ${req.user.email}`);
-
-    res.status(200).json({
-      success: true,
-      message: `Report marked as ${status}`,
-      data: updated,
-    });
-  } catch (error) {
-    console.error('[REPORT ERROR] Status update failed:', error);
-    res.status(500).json({ success: false, message: 'Failed to update status' });
-  }
+  res.status(200).json({
+    success: true,
+    message: `Report marked as ${status}`,
+    data: updated,
+  });
 };
 
 const updateReport = async (req, res) => {

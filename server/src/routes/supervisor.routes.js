@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { requireSupervisor } = require('../middleware/requireSupervisor.middleware');
+const { validate } = require('../middleware/validate');
+const { idParamSchema } = require('../schemas/common');
+const { assignReportSchema, supervisorStatusSchema } = require('../schemas/report');
 const {
   getSupervisorDashboard,
   getTriageReports,
@@ -24,8 +27,8 @@ router.get('/dashboard', getSupervisorDashboard);
 router.get('/reports/triage',         getTriageReports);
 router.get('/reports/active',         getActiveReports);
 router.get('/reports/:id',            getSupervisorReport);
-router.patch('/reports/:id/assign',   assignReport);
-router.patch('/reports/:id/status',   updateSupervisorReportStatus);
+router.patch('/reports/:id/assign',   validate({ params: idParamSchema, body: assignReportSchema }), assignReport);
+router.patch('/reports/:id/status',   validate({ params: idParamSchema, body: supervisorStatusSchema }), updateSupervisorReportStatus);
 router.get('/reports/:id/suggestions', getTeamSuggestions);
 
 // Teams

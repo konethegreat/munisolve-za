@@ -222,11 +222,20 @@ describe('reports', () => {
     test('a citizen cannot set any status except RESOLVED', async () => {
       const report = h.makeReport(alice, { status: 'PENDING' });
 
-      for (const status of ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'REJECTED', 'CLOSED']) {
+      for (const status of ['PENDING', 'IN_PROGRESS', 'REJECTED', 'CLOSED']) {
         const res = await h.api('PATCH', `/api/reports/${report.id}/status`, { token: as(alice), body: { status } });
         assert.equal(res.status, 403, status);
         assert.equal(res.body.errorCode, 'INSUFFICIENT_PERMISSIONS', status);
       }
+
+      // ASSIGNED is refused for every role by the status endpoints: assignment has its own route.
+      const assigned = await h.api('PATCH', `/api/reports/${report.id}/status`, {
+        token: as(alice),
+        body: { status: 'ASSIGNED' },
+      });
+      assert.equal(assigned.status, 400);
+      assert.equal(assigned.body.errorCode, 'ASSIGNMENT_REQUIRED');
+
       assert.equal(reportRow(report.id).status, 'PENDING');
     });
 
@@ -236,8 +245,8 @@ describe('reports', () => {
 
         const res = await h.api('PATCH', `/api/reports/${report.id}/status`, { token: as(alice), body: { status: 'RESOLVED' } });
 
-        assert.equal(res.status, 400, status);
-        assert.equal(res.body.message, `Cannot change status from ${status} to RESOLVED.`);
+        assert.equal(res.status, 409, status);
+        assert.equal(res.body.errorCode, 'INVALID_TRANSITION', status);
         assert.equal(reportRow(report.id).status, status);
       }
     });

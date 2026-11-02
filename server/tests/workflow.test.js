@@ -185,8 +185,8 @@ describe('report lifecycle', () => {
           token: as(supervisor),
           body: { teamId: roadsCrew.id },
         });
-        assert.equal(res.status, 400, status);
-        assert.equal(res.body.message, `Cannot assign a report with status ${status}.`);
+        assert.equal(res.status, 409, status);
+        assert.equal(res.body.errorCode, 'INVALID_TRANSITION');
       }
     });
   });
@@ -199,8 +199,8 @@ describe('report lifecycle', () => {
       body: { status: 'PENDING' },
     });
 
-    assert.equal(res.status, 400);
-    assert.match(res.body.message, /Must be one of: ASSIGNED, IN_PROGRESS, RESOLVED, CLOSED, REJECTED/);
+    assert.equal(res.status, 409);
+    assert.equal(res.body.errorCode, 'INVALID_TRANSITION');
     assert.equal(h.db.tables.report[0].status, 'IN_PROGRESS');
   });
 

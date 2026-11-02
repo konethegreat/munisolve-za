@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 
 const { requireAdmin } = require('../middleware/requireAdmin.middleware');
+const { validate } = require('../middleware/validate');
+const { idParamSchema } = require('../schemas/common');
+const { adminReportStatusSchema } = require('../schemas/report');
 
 const {
   getAdminDashboard,
@@ -25,7 +28,7 @@ router.get('/dashboard', getAdminDashboard);
 // Reports
 router.get('/reports',                    getAdminReports);
 router.get('/reports/:id',                getAdminReport);
-router.patch('/reports/:id/status',       patchAdminReportStatus);
+router.patch('/reports/:id/status',       validate({ params: idParamSchema, body: adminReportStatusSchema }), patchAdminReportStatus);
 router.delete('/reports/:id',             deleteAdminReport);
 
 // Users

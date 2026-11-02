@@ -35,3 +35,19 @@ export const reportListQuerySchema = paginationSchema.extend({
   category: categorySchema.optional(),
   municipality: z.string().trim().min(2).max(120).optional(),
 });
+
+export const assignReportSchema = z.object({
+  teamId: z.coerce.number().int().positive(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const supervisorStatusSchema = z.object({
+  status: reportStatusSchema,
+  afterPhotoUrl: z.string().trim().url().refine((value) => value.startsWith('https://'), 'After-photo URL must use HTTPS').optional(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const adminReportStatusSchema = z.object({
+  status: reportStatusSchema,
+  reason: z.string().trim().min(10, 'A force override reason must be at least 10 characters').max(500).optional(),
+});

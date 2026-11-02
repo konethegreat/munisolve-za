@@ -1,7 +1,5 @@
 const prisma = require('../config/db.config');
-
-// Status transitions allowed by supervisors
-const SUPERVISOR_VALID_STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED'];
+const { assignReport: assignReportService, transitionReport } = require('../services/report.service');
 
 // Category → specialization keyword mapping for proximity suggestions
 const CATEGORY_SPEC_KEYWORDS = {
@@ -159,128 +157,45 @@ const getSupervisorReport = async (req, res) => {
 // ── Assign report to a team ────────────────────────────────────────────────
 
 const assignReport = async (req, res) => {
-  try {
-    const reportId = parseInt(req.params.id);
-    const { teamId, note } = req.body;
+  const { id } = req.validated.params;
+  const { teamId, note } = req.validated.body;
 
-    if (!teamId) {
-      return res.status(400).json({ success: false, message: 'teamId is required.' });
-    }
+  const updated = await assignReportService({
+    reportId: id,
+    teamId,
+    note,
+    actor: { id: req.user.id, role: req.user.role },
+    requestId: req.id,
+  });
 
-    const [report, team] = await Promise.all([
-      prisma.report.findUnique({ where: { id: reportId } }),
-      prisma.team.findUnique({ where: { id: parseInt(teamId) } }),
-    ]);
-
-    if (!report) return res.status(404).json({ success: false, message: 'Report not found.' });
-    if (!team) return res.status(404).json({ success: false, message: 'Team not found.' });
-    if (!team.isActive) {
-      return res.status(400).json({ success: false, message: 'Cannot assign to an inactive team.' });
-    }
-    if (!['PENDING', 'ASSIGNED'].includes(report.status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot assign a report with status ${report.status}.`,
-      });
-    }
-
-    const updated = await prisma.report.update({
-      where: { id: reportId },
-      data: { status: 'ASSIGNED', assignedTeamId: parseInt(teamId), assignedAt: new Date() },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-        team: { select: { id: true, name: true, specialization: true } },
-      },
-    });
-
-    await prisma.activityLog.create({
-      data: {
-        userId: req.user.id,
-        action: 'REPORT_ASSIGNED',
-        entity: 'Report',
-        entityId: reportId,
-        description: `Report #${reportId} assigned to team "${team.name}"${note ? `: ${note}` : ''}`,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-      },
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `Report assigned to ${team.name}`,
-      data: updated,
-    });
-  } catch (error) {
-    if (error?.code === 'P2025') {
-      return res.status(404).json({ success: false, message: 'Report not found.' });
-    }
-    console.error('[SUPERVISOR] assignReport:', error);
-    return res.status(500).json({ success: false, message: 'Failed to assign report.' });
-  }
+  return res.status(200).json({
+    success: true,
+    message: `Report assigned to ${updated.team.name}`,
+    data: updated,
+  });
 };
 
 // ── Update report status (supervisor workflow) ─────────────────────────────
 
 const updateSupervisorReportStatus = async (req, res) => {
-  try {
-    const reportId = parseInt(req.params.id);
-    const { status, afterPhotoUrl, note } = req.body;
+  const { id } = req.validated.params;
+  const { status, afterPhotoUrl, note } = req.validated.body;
 
-    if (!SUPERVISOR_VALID_STATUSES.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status. Must be one of: ${SUPERVISOR_VALID_STATUSES.join(', ')}`,
-      });
-    }
+  const updated = await transitionReport({
+    reportId: id,
+    actor: { id: req.user.id, role: req.user.role },
+    nextStatus: status,
+    afterPhotoUrl,
+    note,
+    requestId: req.id,
+    source: 'supervisor',
+  });
 
-    const report = await prisma.report.findUnique({ where: { id: reportId } });
-    if (!report) return res.status(404).json({ success: false, message: 'Report not found.' });
-
-    // Enforce afterPhotoUrl when moving to RESOLVED
-    if (status === 'RESOLVED' && !afterPhotoUrl && !report.afterPhotoUrl) {
-      return res.status(400).json({
-        success: false,
-        message: 'An after-photo URL is required to mark a report as Resolved.',
-        errorCode: 'AFTER_PHOTO_REQUIRED',
-      });
-    }
-
-    const updateData = { status };
-    if (afterPhotoUrl) updateData.afterPhotoUrl = afterPhotoUrl;
-
-    const updated = await prisma.report.update({
-      where: { id: reportId },
-      data: updateData,
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-        team: { select: { id: true, name: true, specialization: true } },
-      },
-    });
-
-    await prisma.activityLog.create({
-      data: {
-        userId: req.user.id,
-        action: 'REPORT_STATUS_CHANGED',
-        entity: 'Report',
-        entityId: reportId,
-        description: `Report #${reportId} status changed: ${report.status} → ${status}${note ? ` — ${note}` : ''}`,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-      },
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `Status updated to ${status}`,
-      data: updated,
-    });
-  } catch (error) {
-    if (error?.code === 'P2025') {
-      return res.status(404).json({ success: false, message: 'Report not found.' });
-    }
-    console.error('[SUPERVISOR] updateSupervisorReportStatus:', error);
-    return res.status(500).json({ success: false, message: 'Failed to update report status.' });
-  }
+  return res.status(200).json({
+    success: true,
+    message: `Status updated to ${status}`,
+    data: updated,
+  });
 };
 
 // ── Proximity & category-match suggestions for a report ───────────────────

@@ -1,6 +1,6 @@
 const prisma = require('../config/db.config');
+const { transitionReport } = require('../services/report.service');
 
-const VALID_REPORT_STATUSES = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED', 'CLOSED'];
 const VALID_ROLES = ['CITIZEN', 'MUNICIPAL_ADMIN', 'SUPER_ADMIN', 'WORKER_SUPERVISOR'];
 
 // ── Reports ────────────────────────────────────────────────────────────────
@@ -69,46 +69,19 @@ const getAdminReport = async (req, res) => {
 };
 
 const patchAdminReportStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
+  const { id } = req.validated.params;
+  const { status, reason } = req.validated.body;
 
-    if (!VALID_REPORT_STATUSES.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status. Must be one of: ${VALID_REPORT_STATUSES.join(', ')}`,
-        errorCode: 'INVALID_STATUS',
-      });
-    }
+  const updated = await transitionReport({
+    reportId: id,
+    actor: { id: req.user.id, role: req.user.role },
+    nextStatus: status,
+    reason,
+    requestId: req.id,
+    source: 'admin',
+  });
 
-    const updated = await prisma.report.update({
-      where: { id: parseInt(id) },
-      data: { status },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-    });
-
-    await prisma.activityLog.create({
-      data: {
-        userId: req.user.id,
-        action: 'ADMIN_UPDATE_REPORT_STATUS',
-        entity: 'Report',
-        entityId: updated.id,
-        description: `Admin set report #${id} status to ${status}`,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-      },
-    });
-
-    return res.status(200).json({ success: true, message: `Status updated to ${status}`, data: updated });
-  } catch (error) {
-    if (error?.code === 'P2025') {
-      return res.status(404).json({ success: false, message: 'Report not found' });
-    }
-    console.error('[ADMIN] patchAdminReportStatus:', error);
-    return res.status(500).json({ success: false, message: 'Failed to update report status.' });
-  }
+  return res.status(200).json({ success: true, message: `Status updated to ${status}`, data: updated });
 };
 
 const deleteAdminReport = async (req, res) => {
