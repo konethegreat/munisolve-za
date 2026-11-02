@@ -212,4 +212,66 @@ describe('report lifecycle', () => {
 
     assert.equal(res.status, 404);
   });
+
+  test('a supervisor manages teams through validated requests', async () => {
+    const invalidTriage = await h.api('GET', '/api/supervisor/reports/triage?limit=101', {
+      token: as(supervisor),
+    });
+    assert.equal(invalidTriage.status, 400);
+    assert.equal(invalidTriage.body.errorCode, 'VALIDATION_ERROR');
+
+    const created = await h.api('POST', '/api/supervisor/teams', {
+      token: as(supervisor),
+      body: {
+        name: 'Parks Crew',
+        specialization: 'Parks & Recreation',
+        municipality: 'City of Johannesburg',
+        latitude: -26.2041,
+        longitude: 28.0473,
+      },
+    });
+    assert.equal(created.status, 201);
+    assert.equal(typeof created.body.data.latitude, 'number');
+    assert.equal(created.body.data.latitude, -26.2041);
+    assert.equal(created.body.data.longitude, 28.0473);
+
+    const invalid = await h.api('POST', '/api/supervisor/teams', {
+      token: as(supervisor),
+      body: { name: 'X' },
+    });
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.errorCode, 'VALIDATION_ERROR');
+
+    const teamId = created.body.data.id;
+    const toggled = await h.api('PATCH', `/api/supervisor/teams/${teamId}`, {
+      token: as(supervisor),
+      body: { isActive: false },
+    });
+    assert.equal(toggled.status, 200);
+    assert.equal(toggled.body.data.isActive, false);
+
+    const moved = await h.api('PATCH', `/api/supervisor/teams/${teamId}`, {
+      token: as(supervisor),
+      body: { latitude: -26.1, longitude: 28 },
+    });
+    assert.equal(moved.status, 200);
+    assert.equal(typeof moved.body.data.latitude, 'number');
+
+    const missing = await h.api('PATCH', '/api/supervisor/teams/9999', {
+      token: as(supervisor),
+      body: { isActive: true },
+    });
+    assert.equal(missing.status, 404);
+    assert.equal(missing.body.errorCode, 'TEAM_NOT_FOUND');
+
+    const inactive = await h.api('GET', '/api/supervisor/teams?isActive=false', {
+      token: as(supervisor),
+    });
+    assert.deepEqual(inactive.body.data.map((team) => team.name), ['Parks Crew']);
+
+    const trail = h.db.tables.activityLog
+      .filter((log) => log.entity === 'Team')
+      .map((log) => log.action);
+    assert.deepEqual(trail, ['TEAM_CREATED', 'TEAM_UPDATED', 'TEAM_UPDATED']);
+  });
 });
