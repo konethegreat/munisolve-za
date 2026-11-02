@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const prisma = require('../config/db.config');
+const { AppError } = require('../errors/AppError');
 const { sendVerificationEmail } = require('../services/email.service');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -25,358 +26,269 @@ function makeJwt(user) {
 // ── Register ───────────────────────────────────────────────────────────────
 
 const register = async (req, res) => {
-  try {
-    const { firstName, lastName, email, password, phone } = req.body;
+  const { firstName, lastName, email, password, phone } = req.validated.body;
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
 
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: 'An account with this email already exists',
-        errorCode: 'EMAIL_EXISTS',
-      });
-    }
+  if (existingUser) throw new AppError(409, 'EMAIL_EXISTS', 'An account with this email already exists');
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+  const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Generate OTP and store a SHA-256 hash of it (never store plaintext)
-    const otp = generateOtp();
-    const tokenHash = crypto.createHash('sha256').update(otp).digest('hex');
-    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  // Generate OTP and store a SHA-256 hash of it (never store plaintext)
+  const otp = generateOtp();
+  const tokenHash = crypto.createHash('sha256').update(otp).digest('hex');
+  const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-    const newUser = await prisma.user.create({
-      data: {
-        firstName,
-        lastName,
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        phone: phone || null,
-        role: 'CITIZEN',
-        isActive: true,
-        isVerified: false,
-        emailVerifToken: tokenHash,
-        emailVerifExpiry: expiry,
-      },
-      select: {
-        id: true, firstName: true, lastName: true, email: true,
-        phone: true, role: true, isActive: true, isVerified: true, createdAt: true,
-      },
-    });
+  const newUser = await prisma.user.create({
+    data: {
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword,
+      phone: phone || null,
+      role: 'CITIZEN',
+      isActive: true,
+      isVerified: false,
+      emailVerifToken: tokenHash,
+      emailVerifExpiry: expiry,
+    },
+    select: {
+      id: true, firstName: true, lastName: true, email: true,
+      phone: true, role: true, isActive: true, isVerified: true, createdAt: true,
+    },
+  });
 
-    const token = makeJwt(newUser);
+  const token = makeJwt(newUser);
 
-    await prisma.activityLog.create({
-      data: {
-        userId: newUser.id, action: 'REGISTER', entity: 'User', entityId: newUser.id,
-        description: `New user registered: ${email}`,
-        ipAddress: req.ip, userAgent: req.get('User-Agent'),
-      },
-    });
+  await prisma.activityLog.create({
+    data: {
+      userId: newUser.id, action: 'REGISTER', entity: 'User', entityId: newUser.id,
+      description: `New user registered: ${email}`,
+      ipAddress: req.ip, userAgent: req.get('User-Agent'),
+    },
+  });
 
-    // Fire-and-forget — don't fail registration if email delivery fails
-    sendVerificationEmail(newUser.email, newUser.firstName, otp).catch((err) =>
-      console.error('[REGISTER] Verification email failed to send:', err)
-    );
+  // Fire-and-forget — don't fail registration if email delivery fails
+  sendVerificationEmail(newUser.email, newUser.firstName, otp).catch((err) =>
+    console.error('[REGISTER] Verification email failed to send:', err)
+  );
 
-    return res.status(201).json({
-      success: true,
-      message: 'Account created. Check your email for your verification code.',
-      data: { user: newUser, token, expiresIn: process.env.JWT_EXPIRES_IN || '24h' },
-    });
-  } catch (error) {
-    console.error('[AUTH] register error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Registration failed. Please try again.',
-      errorCode: 'REGISTRATION_ERROR',
-      ...(process.env.NODE_ENV === 'development' && { debug: error.message }),
-    });
-  }
+  return res.status(201).json({
+    success: true,
+    message: 'Account created. Check your email for your verification code.',
+    data: { user: newUser, token, expiresIn: process.env.JWT_EXPIRES_IN || '24h' },
+  });
 };
 
 // ── Login ──────────────────────────────────────────────────────────────────
 
 const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.validated.body;
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  const user = await prisma.user.findUnique({ where: { email } });
 
-    if (!user) {
-      return res.status(401).json({
-        success: false, message: 'Invalid email or password', errorCode: 'INVALID_CREDENTIALS',
-      });
-    }
+  if (!user) throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+  if (!user.isActive) throw new AppError(403, 'ACCOUNT_DEACTIVATED', 'Your account has been deactivated.');
 
-    if (!user.isActive) {
-      return res.status(403).json({
-        success: false, message: 'Your account has been deactivated.', errorCode: 'ACCOUNT_DEACTIVATED',
-      });
-    }
+  const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      await prisma.activityLog.create({
-        data: {
-          userId: user.id, action: 'LOGIN_FAILED', entity: 'User', entityId: user.id,
-          description: `Failed login attempt for ${email}`,
-          ipAddress: req.ip, userAgent: req.get('User-Agent'),
-        },
-      });
-      return res.status(401).json({
-        success: false, message: 'Invalid email or password', errorCode: 'INVALID_CREDENTIALS',
-      });
-    }
-
-    const token = makeJwt(user);
-
-    await Promise.all([
-      prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } }),
-      prisma.activityLog.create({
-        data: {
-          userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id,
-          description: `User logged in: ${email}`,
-          ipAddress: req.ip, userAgent: req.get('User-Agent'),
-        },
-      }),
-    ]);
-
-    const { password: _, emailVerifToken: __, emailVerifExpiry: ___, ...safeUser } = user;
-
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      data: { user: safeUser, token, expiresIn: process.env.JWT_EXPIRES_IN || '24h' },
+  if (!isPasswordValid) {
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id, action: 'LOGIN_FAILED', entity: 'User', entityId: user.id,
+        description: `Failed login attempt for ${email}`,
+        ipAddress: req.ip, userAgent: req.get('User-Agent'),
+      },
     });
-  } catch (error) {
-    console.error('[AUTH] login error:', error);
-    return res.status(500).json({ success: false, message: 'Login failed.', errorCode: 'LOGIN_ERROR' });
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
   }
+
+  const token = makeJwt(user);
+
+  await Promise.all([
+    prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } }),
+    prisma.activityLog.create({
+      data: {
+        userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id,
+        description: `User logged in: ${email}`,
+        ipAddress: req.ip, userAgent: req.get('User-Agent'),
+      },
+    }),
+  ]);
+
+  const { password: _, emailVerifToken: __, emailVerifExpiry: ___, ...safeUser } = user;
+
+  return res.status(200).json({
+    success: true,
+    message: 'Login successful',
+    data: { user: safeUser, token, expiresIn: process.env.JWT_EXPIRES_IN || '24h' },
+  });
 };
 
 // ── Google OAuth ───────────────────────────────────────────────────────────
 
 const googleLogin = async (req, res) => {
+  const { idToken } = req.validated.body;
+
+  let ticket;
   try {
-    const { idToken } = req.body;
-    const ticket = await client.verifyIdToken({
+    ticket = await client.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
+  } catch {
+    throw new AppError(401, 'INVALID_GOOGLE_TOKEN', 'Invalid Google token');
+  }
 
-    const payload = ticket.getPayload();
-    const { email, given_name, family_name, sub: googleId } = payload;
+  const payload = ticket.getPayload();
+  const { email, given_name, family_name, sub: googleId } = payload;
 
-    let user = await prisma.user.findUnique({ where: { email } });
+  let user = await prisma.user.findUnique({ where: { email } });
 
-    if (user) {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { googleId, isVerified: true, lastLogin: new Date() },
-      });
-    } else {
-      user = await prisma.user.create({
-        data: {
-          email,
-          firstName: given_name,
-          lastName: family_name || '',
-          googleId,
-          password: '',
-          phone: 'N/A',
-          role: 'CITIZEN',
-          isVerified: true,
-        },
-      });
-    }
-
-    // BUG FIX: was { id: user.id } — auth.middleware.js reads decoded.userId
-    const token = makeJwt(user);
-
-    await prisma.activityLog.create({
+  if (user) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { googleId, isVerified: true, lastLogin: new Date() },
+    });
+  } else {
+    user = await prisma.user.create({
       data: {
-        userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id,
-        description: `Google login: ${email}`,
-        ipAddress: req.ip, userAgent: req.get('User-Agent'),
+        email,
+        firstName: given_name,
+        lastName: family_name || '',
+        googleId,
+        password: '',
+        phone: 'N/A',
+        role: 'CITIZEN',
+        isVerified: true,
       },
     });
-
-    const { password: _, emailVerifToken: __, emailVerifExpiry: ___, ...safeUser } = user;
-
-    return res.status(200).json({ success: true, data: { user: safeUser, token } });
-  } catch (error) {
-    console.error('[AUTH] googleLogin error:', error);
-    return res.status(401).json({ success: false, message: 'Invalid Google token' });
   }
+
+  // BUG FIX: was { id: user.id } — auth.middleware.js reads decoded.userId
+  const token = makeJwt(user);
+
+  await prisma.activityLog.create({
+    data: {
+      userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id,
+      description: `Google login: ${email}`,
+      ipAddress: req.ip, userAgent: req.get('User-Agent'),
+    },
+  });
+
+  const { password: _, emailVerifToken: __, emailVerifExpiry: ___, ...safeUser } = user;
+
+  return res.status(200).json({ success: true, data: { user: safeUser, token } });
 };
 
 // ── Send / Resend Verification OTP ────────────────────────────────────────
 
 const sendVerificationOtp = async (req, res) => {
-  try {
-    const { email } = req.body;
+  const { email } = req.validated.body;
 
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email is required.' });
-    }
+  const user = await prisma.user.findUnique({ where: { email } });
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-
-    // Don't reveal whether the account exists
-    if (!user) {
-      return res.status(200).json({
-        success: true,
-        message: 'If an account with that email exists, a code has been sent.',
-      });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'This account is already verified.',
-        errorCode: 'ALREADY_VERIFIED',
-      });
-    }
-
-    const otp = generateOtp();
-    const tokenHash = crypto.createHash('sha256').update(otp).digest('hex');
-    const expiry = new Date(Date.now() + 15 * 60 * 1000);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerifToken: tokenHash, emailVerifExpiry: expiry },
-    });
-
-    await sendVerificationEmail(user.email, user.firstName, otp);
-
+  // Don't reveal whether the account exists
+  if (!user) {
     return res.status(200).json({
       success: true,
-      message: 'Verification code sent. Check your inbox.',
+      message: 'If an account with that email exists, a code has been sent.',
     });
-  } catch (error) {
-    console.error('[AUTH] sendVerificationOtp error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to send verification code.' });
   }
+
+  if (user.isVerified) throw new AppError(400, 'ALREADY_VERIFIED', 'This account is already verified.');
+
+  const otp = generateOtp();
+  const tokenHash = crypto.createHash('sha256').update(otp).digest('hex');
+  const expiry = new Date(Date.now() + 15 * 60 * 1000);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerifToken: tokenHash, emailVerifExpiry: expiry },
+  });
+
+  await sendVerificationEmail(user.email, user.firstName, otp);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Verification code sent. Check your inbox.',
+  });
 };
 
 // ── Verify Email with OTP ──────────────────────────────────────────────────
 
 const verifyEmail = async (req, res) => {
-  try {
-    const { email, otp } = req.body;
+  const { email, otp } = req.validated.body;
 
-    if (!email || !otp) {
-      return res.status(400).json({ success: false, message: 'Email and code are required.' });
-    }
+  const user = await prisma.user.findUnique({ where: { email } });
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  if (!user) throw new AppError(400, 'INVALID_CODE', 'Invalid or expired code.');
+  if (user.isVerified) throw new AppError(400, 'ALREADY_VERIFIED', 'Account is already verified.');
+  if (!user.emailVerifToken || !user.emailVerifExpiry) throw new AppError(400, 'NO_CODE', 'No verification code found. Request a new one.');
+  if (new Date() > user.emailVerifExpiry) throw new AppError(400, 'CODE_EXPIRED', 'Code has expired. Request a new one.');
 
-    if (!user) {
-      return res.status(400).json({
-        success: false, message: 'Invalid or expired code.', errorCode: 'INVALID_CODE',
-      });
-    }
+  const submittedHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+  const isValid = crypto.timingSafeEqual(
+    Buffer.from(submittedHash, 'hex'),
+    Buffer.from(user.emailVerifToken, 'hex')
+  );
 
-    if (user.isVerified) {
-      return res.status(400).json({
-        success: false, message: 'Account is already verified.', errorCode: 'ALREADY_VERIFIED',
-      });
-    }
+  if (!isValid) throw new AppError(400, 'INVALID_CODE', 'Invalid code. Please try again.');
 
-    if (!user.emailVerifToken || !user.emailVerifExpiry) {
-      return res.status(400).json({
-        success: false, message: 'No verification code found. Request a new one.', errorCode: 'NO_CODE',
-      });
-    }
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: { isVerified: true, emailVerifToken: null, emailVerifExpiry: null },
+    select: {
+      id: true, firstName: true, lastName: true, email: true,
+      phone: true, role: true, isActive: true, isVerified: true, createdAt: true, lastLogin: true,
+    },
+  });
 
-    if (new Date() > user.emailVerifExpiry) {
-      return res.status(400).json({
-        success: false, message: 'Code has expired. Request a new one.', errorCode: 'CODE_EXPIRED',
-      });
-    }
+  await prisma.activityLog.create({
+    data: {
+      userId: user.id, action: 'EMAIL_VERIFIED', entity: 'User', entityId: user.id,
+      description: `Email verified for ${email}`,
+      ipAddress: req.ip, userAgent: req.get('User-Agent'),
+    },
+  });
 
-    const submittedHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(submittedHash, 'hex'),
-      Buffer.from(user.emailVerifToken, 'hex')
-    );
-
-    if (!isValid) {
-      return res.status(400).json({
-        success: false, message: 'Invalid code. Please try again.', errorCode: 'INVALID_CODE',
-      });
-    }
-
-    const updated = await prisma.user.update({
-      where: { id: user.id },
-      data: { isVerified: true, emailVerifToken: null, emailVerifExpiry: null },
-      select: {
-        id: true, firstName: true, lastName: true, email: true,
-        phone: true, role: true, isActive: true, isVerified: true, createdAt: true, lastLogin: true,
-      },
-    });
-
-    await prisma.activityLog.create({
-      data: {
-        userId: user.id, action: 'EMAIL_VERIFIED', entity: 'User', entityId: user.id,
-        description: `Email verified for ${email}`,
-        ipAddress: req.ip, userAgent: req.get('User-Agent'),
-      },
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: 'Email verified successfully.',
-      data: { user: updated },
-    });
-  } catch (error) {
-    console.error('[AUTH] verifyEmail error:', error);
-    return res.status(500).json({ success: false, message: 'Verification failed.' });
-  }
+  return res.status(200).json({
+    success: true,
+    message: 'Email verified successfully.',
+    data: { user: updated },
+  });
 };
 
 // ── Get Current User ───────────────────────────────────────────────────────
 
 const getCurrentUser = async (req, res) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: {
-        id: true, firstName: true, lastName: true, email: true,
-        phone: true, role: true, isActive: true, isVerified: true,
-        createdAt: true, lastLogin: true,
-      },
-    });
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: {
+      id: true, firstName: true, lastName: true, email: true,
+      phone: true, role: true, isActive: true, isVerified: true,
+      createdAt: true, lastLogin: true,
+    },
+  });
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
+  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-    return res.status(200).json({ success: true, data: user });
-  } catch (error) {
-    console.error('[AUTH] getCurrentUser error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to retrieve user' });
-  }
+  return res.status(200).json({ success: true, data: user });
 };
 
 // ── Logout ─────────────────────────────────────────────────────────────────
 
 const logout = async (req, res) => {
-  try {
-    await prisma.activityLog.create({
-      data: {
-        userId: req.user.id, action: 'LOGOUT', entity: 'User', entityId: req.user.id,
-        description: `User logged out: ${req.user.email}`,
-        ipAddress: req.ip, userAgent: req.get('User-Agent'),
-      },
-    });
-    return res.status(200).json({ success: true, message: 'Logout successful' });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Logout failed' });
-  }
+  await prisma.activityLog.create({
+    data: {
+      userId: req.user.id, action: 'LOGOUT', entity: 'User', entityId: req.user.id,
+      description: `User logged out: ${req.user.email}`,
+      ipAddress: req.ip, userAgent: req.get('User-Agent'),
+    },
+  });
+  return res.status(200).json({ success: true, message: 'Logout successful' });
 };
 
 module.exports = { register, login, googleLogin, sendVerificationOtp, verifyEmail, getCurrentUser, logout };

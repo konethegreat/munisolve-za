@@ -12,19 +12,22 @@ const {
 } = require('../controllers/auth.controller');
 
 const { authenticate } = require('../middleware/auth.middleware');
+const { validate } = require('../middleware/validate');
 const {
-  validateRegistration,
-  validateLogin,
-  handleValidationErrors,
-} = require('../middleware/validation.middleware');
+  registerSchema,
+  loginSchema,
+  googleLoginSchema,
+  sendVerificationSchema,
+  verifyEmailSchema,
+} = require('../schemas/auth');
 const { authLimiter, passwordResetLimiter, emailVerifLimiter } = require('../middleware/rateLimit.middleware');
 
 // ── Public ─────────────────────────────────────────────────────────────────
-router.post('/register',           authLimiter,       validateRegistration, handleValidationErrors, register);
-router.post('/login',              authLimiter,       validateLogin,        handleValidationErrors, login);
-router.post('/google',             authLimiter,       googleLogin);
-router.post('/send-verification',  emailVerifLimiter, sendVerificationOtp);
-router.post('/verify-email',       emailVerifLimiter, verifyEmail);
+router.post('/register',          authLimiter,       validate({ body: registerSchema }), register);
+router.post('/login',             authLimiter,       validate({ body: loginSchema }), login);
+router.post('/google',            authLimiter,       validate({ body: googleLoginSchema }), googleLogin);
+router.post('/send-verification', emailVerifLimiter, validate({ body: sendVerificationSchema }), sendVerificationOtp);
+router.post('/verify-email',      emailVerifLimiter, validate({ body: verifyEmailSchema }), verifyEmail);
 
 // ── Protected ──────────────────────────────────────────────────────────────
 router.get('/me',      authenticate, getCurrentUser);
