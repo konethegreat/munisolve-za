@@ -8,6 +8,8 @@ const { getWeatherForLocation } = require('../services/weather.service');
 const { transitionReport } = require('../services/report.service');
 const { slaWindowsForNewReport } = require('../services/sla.service');
 const { suggestDuplicates, autoMergeSameReporter } = require('../services/duplicate.service');
+const { enqueueReportEvent } = require('../services/webhook.service');
+const { logger } = require('../logger');
 
 const createReport = async (req, res) => {
   const { title, description, category, municipality, address, latitude, longitude } = req.validated.body;
@@ -84,6 +86,16 @@ const createReport = async (req, res) => {
         include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
       })
     : report;
+
+  try {
+    await enqueueReportEvent({
+      event: 'report.created',
+      report: finalReport,
+      extra: { duplicateSuggestions: duplicates.length, mergedIntoId: mergedInto?.id ?? null },
+    });
+  } catch (error) {
+    logger.warn({ err: error, reportId: report.id }, 'Webhook enqueue failed');
+  }
 
   res.status(201).json({
     success: true,

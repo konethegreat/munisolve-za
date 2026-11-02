@@ -222,3 +222,38 @@ model NotificationOutbox {
   @@index([status, nextAttemptAt])
   @@index([reportId])
 }
+
+model WebhookSubscription {
+  id          Int               @id @default(autoincrement())
+  url         String
+  description String?
+  events      String
+  secret      String
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deliveries  WebhookDelivery[]
+
+  @@index([isActive])
+}
+
+model WebhookDelivery {
+  id             Int                 @id @default(autoincrement())
+  subscriptionId Int
+  subscription   WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  dedupeKey      String              @unique
+  event          String
+  payload        String
+  status         String              @default("PENDING")
+  attempts       Int                 @default(0)
+  maxAttempts    Int                 @default(5)
+  nextAttemptAt  DateTime            @default(now())
+  lastError      String?
+  responseStatus Int?
+  deliveredAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([subscriptionId, createdAt])
+}

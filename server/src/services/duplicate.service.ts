@@ -1,4 +1,5 @@
 import prisma from '../config/db.config';
+import { logger } from '../logger';
 import { AppError } from '../errors/AppError';
 import { OPEN_REPORT_STATUSES } from '../domain/sla';
 import {
@@ -10,6 +11,7 @@ import {
 } from '../domain/duplicates';
 import type { DuplicateReport } from '../domain/duplicates';
 import { slaWindowsForNewReport } from './sla.service';
+import { enqueueReportEvent } from './webhook.service';
 
 export interface DuplicateActor {
   id: number;
@@ -148,7 +150,7 @@ export async function confirmDuplicate(options: {
 } & EventContext) {
   const now = options.now ?? new Date();
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const report = await loadReportForActor(tx, options.reportId, options.actor);
     if (report.id === options.candidateId) {
       throw new AppError(400, 'SELF_MERGE', 'A report cannot be merged into itself.');
@@ -245,6 +247,18 @@ export async function confirmDuplicate(options: {
     const updated = await tx.report.findUnique({ where: { id: report.id }, include: reportInclude });
     return { report: updated, canonical };
   });
+
+  try {
+    await enqueueReportEvent({
+      event: 'report.merged',
+      report: result.report,
+      extra: { canonicalId: result.canonical.id },
+    });
+  } catch (error) {
+    logger.warn({ err: error, reportId: options.reportId }, 'Webhook enqueue failed');
+  }
+
+  return result;
 }
 
 export async function dismissDuplicate(options: {
@@ -294,7 +308,7 @@ export async function unmergeReport(options: {
 } & EventContext) {
   const now = options.now ?? new Date();
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const report = await tx.report.findUnique({ where: { id: options.reportId } });
     if (!report) throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found.');
     if (!report.duplicateOfId || report.closureReason !== 'DUPLICATE') {
@@ -367,6 +381,14 @@ export async function unmergeReport(options: {
 
     return updated;
   });
+
+  try {
+    await enqueueReportEvent({ event: 'report.unmerged', report: updated });
+  } catch (error) {
+    logger.warn({ err: error, reportId: options.reportId }, 'Webhook enqueue failed');
+  }
+
+  return updated;
 }
 
 // Used by report creation: a same-reporter match that is nearly certain is merged immediately.

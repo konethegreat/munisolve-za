@@ -27,6 +27,15 @@ const {
   getAdminActivityLogs,
 } = require('../controllers/admin.controller');
 const { unmergeReport } = require('../controllers/duplicate.controller');
+const {
+  listWebhooks,
+  createWebhook,
+  updateWebhook,
+  rotateWebhookSecret,
+  deleteWebhook,
+  listWebhookDeliveries,
+} = require('../controllers/webhook.controller');
+const { webhookCreateSchema, webhookUpdateSchema } = require('../schemas/webhook');
 
 router.use(requireAdmin);
 
@@ -49,5 +58,13 @@ router.delete('/users/:id', validate({ params: idParamSchema }), deleteAdminUser
 
 // Activity logs
 router.get('/activity-logs', validate({ query: adminActivityLogsQuerySchema }), getAdminActivityLogs);
+
+// Outbound webhooks
+router.get('/webhooks', listWebhooks);
+router.post('/webhooks', validate({ body: webhookCreateSchema }), createWebhook);
+router.patch('/webhooks/:id', validate({ params: idParamSchema, body: webhookUpdateSchema }), updateWebhook);
+router.post('/webhooks/:id/rotate-secret', validate({ params: idParamSchema }), rotateWebhookSecret);
+router.get('/webhooks/:id/deliveries', validate({ params: idParamSchema }), listWebhookDeliveries);
+router.delete('/webhooks/:id', validate({ params: idParamSchema }), deleteWebhook);
 
 module.exports = router;

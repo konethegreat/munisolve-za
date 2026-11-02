@@ -28,7 +28,8 @@ const env = {
   DEMO_PASSWORD: verify ? `${randomBytes(20).toString('hex')}Aa1!` : requirePassword(),
   POSTGRES_PASSWORD: randomBytes(24).toString('hex'),
   ANTHROPIC_API_KEY: '', ANTHROPIC_AUTH_TOKEN: '', RESEND_API_KEY: '',
-  WEATHER_API_KEY: '', GOOGLE_CLIENT_ID: '', VITE_GOOGLE_CLIENT_ID: '',
+  WEATHER_ENABLED: 'false', GEO_ENABLED: 'false',
+  GOOGLE_CLIENT_ID: '', VITE_GOOGLE_CLIENT_ID: '',
   RESEND_FROM_EMAIL: '',
 };
 
@@ -120,7 +121,7 @@ async function main() {
   vite.once('exit', () => { if (!finishing) cleanup().then(() => process.exit(1)); });
   console.log(`\nSynthetic demo: ${env.CLIENT_URL}/login`);
   console.log('Use the four demo.*@example.com accounts and your DEMO_PASSWORD.');
-  console.log('No email, AI or weather credentials are configured. Stop with Ctrl+C to remove this database.');
+  console.log('No email, AI, weather or geocoding providers are configured. Stop with Ctrl+C to remove this database.');
   await new Promise(() => {});
 }
 

@@ -48,12 +48,13 @@ describe('internal tick endpoint', () => {
       skipped: 0,
       autoAssigned: 0,
       decisions: 0,
+      webhooksSent: 0,
+      webhooksFailed: 0,
     });
     assert.equal(JSON.stringify(res.body).includes(h.tickSecret), false);
   });
 
-  test('enqueues and emails an overdue report', async () => {
-    const owner = h.makeUser({ email: 'citizen@example.com' });
+  test('enqueues and emails an overdue report', async () => {    const owner = h.makeUser({ email: 'citizen@example.com' });
     h.makeUser({ email: 'admin@example.com', role: 'MUNICIPAL_ADMIN' });
     const now = Date.now();
     h.makeReport(owner, {
@@ -72,5 +73,28 @@ describe('internal tick endpoint', () => {
     assert.deepEqual(h.notifications.map((message) => message.to).sort(), ['admin@example.com', 'citizen@example.com']);
     assert.equal(h.db.tables.notificationOutbox.length, 2);
     assert.ok(h.db.tables.notificationOutbox.every((row) => row.status === 'SENT'));
+  });
+
+  test('fails a webhook delivery aimed at a private address', async () => {
+    const subscription = h.db.add('webhookSubscription', {
+      url: 'https://127.0.0.1/hook',
+      events: '*',
+      secret: 'whsec_test',
+    });
+    h.db.add('webhookDelivery', {
+      subscriptionId: subscription.id,
+      dedupeKey: 'private-target',
+      event: 'report.created',
+      payload: '{"event":"report.created"}',
+    });
+
+    const res = await h.api('POST', '/api/internal/tick', { headers: { 'x-tick-secret': h.tickSecret } });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.webhooksSent, 0);
+    assert.equal(res.body.data.webhooksFailed, 1);
+    const delivery = h.db.tables.webhookDelivery[0];
+    assert.equal(delivery.status, 'FAILED');
+    assert.match(delivery.lastError, /PRIVATE_ADDRESS/);
   });
 });

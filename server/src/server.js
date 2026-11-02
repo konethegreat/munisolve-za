@@ -63,14 +63,19 @@ const reportRoutes     = require('./routes/report.routes');
 const aiRoutes         = require('./routes/ai.routes');
 const adminRoutes      = require('./routes/admin.routes');
 const publicRoutes     = require('./routes/public.routes');
+const geoRoutes        = require('./routes/geo.routes');
 const supervisorRoutes = require('./routes/supervisor.routes');
+const { openapiJson, docsPage } = require('./controllers/docs.controller');
 
 app.use('/api/auth',       authRoutes);
 app.use('/api/reports',    reportRoutes);
 app.use('/api/ai',         aiRoutes);
 app.use('/api/admin',      adminRoutes);
 app.use('/api/public',     publicRoutes);
+app.use('/api/geo',        geoRoutes);
 app.use('/api/supervisor', supervisorRoutes);
+app.get('/api/openapi.json', openapiJson);
+app.get('/api/docs', docsPage);
 
 // --- ERROR HANDLING ---
 // Every unmatched route and every thrown error leaves through the one envelope.
