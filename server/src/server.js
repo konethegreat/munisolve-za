@@ -5,7 +5,7 @@ const helmet = require('helmet');
 require('dotenv').config();
 
 const { requestId } = require('./middleware/requestId.middleware');
-const { httpLogger } = require('./logger');
+const { logger, httpLogger } = require('./logger');
 const { notFound } = require('./middleware/notFound.middleware');
 const { errorHandler } = require('./middleware/error.middleware');
 const { generalLimiter } = require('./middleware/rateLimit.middleware');
@@ -79,8 +79,8 @@ app.use(errorHandler);
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
-    console.log(`🚀 Server heart beating on: http://localhost:${PORT}`);
-    console.log(`🔒 Security layers (Helmet/RateLimit) Active`);
+    logger.info({ port: PORT }, 'API listening');
+    logger.info('Security layers active');
   });
 }
 

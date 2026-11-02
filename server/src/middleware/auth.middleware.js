@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken'); // For JWT token verification
 
 const prisma = require('../config/db.config'); // Import Prisma Client from centralized config
 const { AppError } = require('../errors/AppError');
+const { logger } = require('../logger');
 
 /**
  * ==========================================
@@ -82,7 +83,7 @@ const authenticate = async (req, res, next) => {
   req.user = user;
   req.token = token;
 
-  console.log(`[AUTH] User authenticated: ${user.email} (${user.role})`);
+  logger.info({ userId: user.id, role: user.role }, 'User authenticated');
 
   // STEP 6: Proceed to next middleware
   next();
@@ -131,7 +132,7 @@ const optionalAuthenticate = async (req, res, next) => {
     }
   } catch (error) {
     req.user = null;
-    console.log('[OPTIONAL_AUTH] Token invalid, continuing as guest');
+    logger.info('Optional authentication token invalid, continuing as guest');
   }
   
   next();

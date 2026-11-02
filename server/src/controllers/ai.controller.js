@@ -7,6 +7,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const prisma = require('../config/db.config');
 const { AppError } = require('../errors/AppError');
+const { logger } = require('../logger');
 
 const client = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -140,7 +141,7 @@ const chat = async (req, res) => {
   } catch (error) {
     // Only the model call has a fallback: the citizen still gets a human answer,
     // and no internal detail (or debug field) leaks to the caller.
-    console.error('[AI ERROR]', error);
+    logger.error({ err: error }, 'AI chat failed');
 
     return res.status(500).json({
       success: false,
@@ -157,6 +158,7 @@ const chat = async (req, res) => {
       description: `AI chat on report #${report.id}`,
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
@@ -189,7 +191,7 @@ const generateAutoResponse = async (report, user) => {
 
     return response.content[0].text;
   } catch (error) {
-    console.error('[AI AUTO-RESPONSE ERROR]', error);
+    logger.warn({ err: error }, 'AI auto-response failed');
     return `Hi ${user.firstName}! Your report has been received and logged with reference #${String(report.id).padStart(4, '0')}. We'll keep you updated on the progress. You can chat with me here if you have any questions!`;
   }
 };

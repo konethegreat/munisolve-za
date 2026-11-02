@@ -1,4 +1,5 @@
 const { Resend } = require('resend');
+const { logger } = require('../logger');
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM = process.env.RESEND_FROM_EMAIL || 'MuniSolve ZA <noreply@munisolve.co.za>';
@@ -60,7 +61,7 @@ const sendVerificationEmail = async (toEmail, firstName, otp) => {
   });
 
   if (error) {
-    console.error('[EMAIL] Resend error:', error);
+    logger.error({ err: error }, 'Verification email failed');
     throw new Error('Failed to send verification email.');
   }
 };

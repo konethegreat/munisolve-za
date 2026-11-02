@@ -69,6 +69,8 @@ const patchAdminReportStatus = async (req, res) => {
     nextStatus: status,
     reason,
     requestId: req.id,
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent'),
     source: 'admin',
   });
 
@@ -89,6 +91,7 @@ const deleteAdminReport = async (req, res) => {
       description: `Admin deleted report #${id}`,
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
@@ -201,6 +204,7 @@ const patchAdminUserStatus = async (req, res) => {
       description: `Admin ${updated.isActive ? 'activated' : 'deactivated'} user ${target.email}`,
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
@@ -234,6 +238,7 @@ const patchAdminUserRole = async (req, res) => {
       description: `Admin changed user ${updated.email} role to ${role}`,
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
@@ -261,6 +266,7 @@ const deleteAdminUser = async (req, res) => {
       description: `Admin deleted user ${target.email}`,
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 

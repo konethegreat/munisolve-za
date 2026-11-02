@@ -54,6 +54,7 @@ const createReport = async (req, res) => {
     data: {
       userId, action: 'CREATE_REPORT', entity: 'Report', entityId: report.id,
       description: `Report created: ${title}`, ipAddress: req.ip, userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
@@ -133,6 +134,8 @@ const updateStatus = async (req, res) => {
     nextStatus: status,
     note,
     requestId: req.id,
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent'),
     source: 'reports',
   });
 

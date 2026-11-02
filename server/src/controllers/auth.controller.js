@@ -5,6 +5,7 @@ const { OAuth2Client } = require('google-auth-library');
 const prisma = require('../config/db.config');
 const { AppError } = require('../errors/AppError');
 const { sendVerificationEmail } = require('../services/email.service');
+const { logger } = require('../logger');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -67,12 +68,13 @@ const register = async (req, res) => {
       userId: newUser.id, action: 'REGISTER', entity: 'User', entityId: newUser.id,
       description: `New user registered: ${email}`,
       ipAddress: req.ip, userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
   // Fire-and-forget — don't fail registration if email delivery fails
   sendVerificationEmail(newUser.email, newUser.firstName, otp).catch((err) =>
-    console.error('[REGISTER] Verification email failed to send:', err)
+    logger.error({ err }, 'Verification email failed')
   );
 
   return res.status(201).json({
@@ -100,6 +102,7 @@ const login = async (req, res) => {
         userId: user.id, action: 'LOGIN_FAILED', entity: 'User', entityId: user.id,
         description: `Failed login attempt for ${email}`,
         ipAddress: req.ip, userAgent: req.get('User-Agent'),
+        requestId: req.id,
       },
     });
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
@@ -114,6 +117,7 @@ const login = async (req, res) => {
         userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id,
         description: `User logged in: ${email}`,
         ipAddress: req.ip, userAgent: req.get('User-Agent'),
+        requestId: req.id,
       },
     }),
   ]);
@@ -175,6 +179,7 @@ const googleLogin = async (req, res) => {
       userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id,
       description: `Google login: ${email}`,
       ipAddress: req.ip, userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
@@ -251,6 +256,7 @@ const verifyEmail = async (req, res) => {
       userId: user.id, action: 'EMAIL_VERIFIED', entity: 'User', entityId: user.id,
       description: `Email verified for ${email}`,
       ipAddress: req.ip, userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
@@ -286,6 +292,7 @@ const logout = async (req, res) => {
       userId: req.user.id, action: 'LOGOUT', entity: 'User', entityId: req.user.id,
       description: `User logged out: ${req.user.email}`,
       ipAddress: req.ip, userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
   return res.status(200).json({ success: true, message: 'Logout successful' });

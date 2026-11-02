@@ -10,6 +10,7 @@
 
 const prisma = require('../config/db.config');
 const { AppError } = require('../errors/AppError');
+const { logger } = require('../logger');
 
 // Simple in-memory caches (avoids hammering free APIs)
 const cache = {
@@ -67,7 +68,7 @@ const getStats = async (req, res) => {
     cache.stats = { data, ts: now };
     res.status(200).json({ success: true, data });
   } catch (error) {
-    console.error('[PUBLIC] Stats error:', error.message);
+    logger.error({ err: error }, 'Public stats lookup failed');
     res.status(500).json({ success: false, message: 'Failed to load statistics' });
   }
 };

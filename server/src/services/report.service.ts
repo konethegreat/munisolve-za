@@ -18,6 +18,8 @@ interface TransitionOptions {
   afterPhotoUrl?: string;
   reason?: string;
   requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
   source: TransitionSource;
 }
 
@@ -27,6 +29,8 @@ interface AssignOptions {
   note?: string;
   actor: Actor;
   requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 const ACTION_BY_SOURCE: Record<TransitionSource, string> = {
@@ -140,6 +144,8 @@ export async function transitionReport(options: TransitionOptions) {
         entityId: report.id,
         description,
         requestId: options.requestId ?? null,
+        ipAddress: options.ipAddress ?? null,
+        userAgent: options.userAgent ?? null,
       },
     });
 
@@ -190,6 +196,8 @@ export async function assignReport(options: AssignOptions) {
         entityId: report.id,
         description: `Report #${report.id} assigned to team "${team.name}"${options.note ? `: ${options.note}` : ''}`,
         requestId: options.requestId ?? null,
+        ipAddress: options.ipAddress ?? null,
+        userAgent: options.userAgent ?? null,
       },
     });
 

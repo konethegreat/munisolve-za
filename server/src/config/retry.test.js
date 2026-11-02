@@ -6,7 +6,7 @@ const { isRetryableError, withRetry } = require('./retry');
 (async () => {
   let passed = 0;
   const ok = (name) => {
-    console.log(`✓ ${name}`);
+    process.stdout.write(`✓ ${name}\n`);
     passed += 1;
   };
 
@@ -77,8 +77,8 @@ const { isRetryableError, withRetry } = require('./retry');
   assert.equal(calls3, 3); // 1 initial + 2 retries, then rethrow
   ok('withRetry gives up and rethrows after exhausting retries');
 
-  console.log(`\n${passed} checks passed.`);
+  process.stdout.write(`\n${passed} checks passed.\n`);
 })().catch((e) => {
-  console.error('TEST FAILED:', e);
+  process.stderr.write(`TEST FAILED: ${e?.stack || e}\n`);
   process.exit(1);
 });

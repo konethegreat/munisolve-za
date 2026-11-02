@@ -147,6 +147,8 @@ const assignReport = async (req, res) => {
     note,
     actor: { id: req.user.id, role: req.user.role },
     requestId: req.id,
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent'),
   });
 
   return res.status(200).json({
@@ -169,6 +171,8 @@ const updateSupervisorReportStatus = async (req, res) => {
     afterPhotoUrl,
     note,
     requestId: req.id,
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent'),
     source: 'supervisor',
   });
 
@@ -270,6 +274,7 @@ const createTeam = async (req, res) => {
       description: `Team "${name}" (${specialization}) created`,
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 
@@ -304,6 +309,7 @@ const updateTeam = async (req, res) => {
       description: `Team #${teamId} updated`,
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
+      requestId: req.id,
     },
   });
 

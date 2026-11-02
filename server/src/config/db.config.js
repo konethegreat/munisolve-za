@@ -7,6 +7,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const { withRetry } = require('./retry');
+const { logger } = require('../logger');
 
 // Initialize Prisma Client
 const basePrisma = new PrismaClient({
@@ -30,9 +31,9 @@ const prisma = basePrisma.$extends({
 
 // Graceful shutdown handlers
 async function shutdown(signal) {
-  console.log(`\n[DATABASE] ${signal} received — closing database connections...`);
+  logger.info({ signal }, 'Closing database connections');
   await basePrisma.$disconnect();
-  console.log('[DATABASE] Database connections closed');
+  logger.info('Database connections closed');
   process.exit(0);
 }
 
@@ -43,11 +44,11 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 if (process.env.NODE_ENV === 'development') {
   basePrisma.$connect()
     .then(() => {
-      console.log('✅ Database connected successfully');
+      logger.info('Database connected');
     })
     .catch((error) => {
-      console.error('❌ Database connection failed:', error.message);
-      console.error('💡 Make sure PostgreSQL is running and DATABASE_URL in .env is correct');
+      logger.error({ err: error }, 'Database connection failed');
+      logger.error('Make sure PostgreSQL is running and DATABASE_URL in .env is correct');
       process.exit(1);
     });
 }
