@@ -107,7 +107,9 @@ async function startApp() {
   });
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
-  async function api(method, route, { token, body, ip, headers } = {}) {
+  // `body` is JSON-encoded for convenience. `rawBody` is sent verbatim, so a test can
+  // submit a deliberately malformed payload (for example `'{'`) unchanged.
+  async function api(method, route, { token, body, rawBody, ip, headers } = {}) {
     ipCounter += 1;
     const response = await fetch(baseUrl + route, {
       method,
@@ -117,7 +119,7 @@ async function startApp() {
         ...(token && { authorization: `Bearer ${token}` }),
         ...headers,
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: rawBody !== undefined ? rawBody : body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await response.text();
     let json = null;

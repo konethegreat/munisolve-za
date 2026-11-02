@@ -83,7 +83,10 @@ describe('authentication', () => {
         assert.equal((await login(user.email, 'Wrong#Passw0rd9', ip)).status, 401);
       }
 
-      assert.equal((await login(user.email, 'Wrong#Passw0rd9', ip)).status, 429);
+      const limited = await login(user.email, 'Wrong#Passw0rd9', ip);
+      assert.equal(limited.status, 429);
+      assert.equal(limited.body.errorCode, 'RATE_LIMITED');
+      assert.equal(limited.body.message, 'Too many attempts. Please try again later.');
       assert.equal((await login(user.email, h.password, ip)).status, 429);
     });
 

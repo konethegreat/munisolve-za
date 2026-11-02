@@ -9,10 +9,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { generalLimiter } = require('../middleware/rateLimit.middleware');
 const { getStats, getAirQuality, getHolidays } = require('../controllers/public.controller');
-
-router.use(generalLimiter);
 
 router.get('/stats', getStats);
 router.get('/air-quality', getAirQuality);

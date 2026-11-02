@@ -26,6 +26,19 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
     );
   } else if (error?.message === 'Not allowed by CORS') {
     appError = new AppError(403, 'CORS_ORIGIN_DENIED', 'This origin is not allowed to access the API.');
+  } else if (
+    typeof error?.status === 'number' &&
+    error.status >= 400 &&
+    error.status <= 499
+  ) {
+    // Client errors raised by express.json() (http-errors): malformed JSON,
+    // oversized payloads, unsupported charsets and the like. They are the
+    // caller's fault, so they must not be reported as INTERNAL_ERROR.
+    appError = new AppError(
+      error.status,
+      error.type === 'entity.parse.failed' ? 'INVALID_JSON' : 'BAD_REQUEST',
+      'The request could not be processed.',
+    );
   } else {
     appError = mapPrismaError(error) ?? undefined;
   }

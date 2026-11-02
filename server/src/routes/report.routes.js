@@ -14,9 +14,7 @@ const {
 } = require('../controllers/report.controller');
 
 const { authenticate } = require('../middleware/auth.middleware');
-const { generalLimiter } = require('../middleware/rateLimit.middleware');
 
-router.use(generalLimiter);
 router.use(authenticate);
 
 router.post('/',              createReport);

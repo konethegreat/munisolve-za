@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 
-const { generalLimiter } = require('../middleware/rateLimit.middleware');
 const { requireAdmin } = require('../middleware/requireAdmin.middleware');
 
 const {
@@ -18,7 +17,6 @@ const {
   getAdminActivityLogs,
 } = require('../controllers/admin.controller');
 
-router.use(generalLimiter);
 router.use(requireAdmin);
 
 // Dashboard

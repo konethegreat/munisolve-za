@@ -41,6 +41,30 @@ describe('error contract', () => {
     assert.ok(!res.text.includes('secret-value'));
   });
 
+  test('a malformed JSON body is a 400 INVALID_JSON, not a 500', async () => {
+    const res = await h.api('POST', '/api/auth/login', { rawBody: '{' });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.errorCode, 'INVALID_JSON');
+    assert.equal(res.body.message, 'The request could not be processed.');
+    assert.match(res.body.requestId, /^[0-9a-f-]{36}$/);
+    assert.equal(res.headers.get('x-request-id'), res.body.requestId);
+  });
+
+  test('a request from a foreign origin is denied with the CORS envelope', async () => {
+    const origin = 'https://foreign.example.test';
+    assert.notEqual(origin, h.clientOrigin);
+
+    const res = await h.api('GET', '/api/public/stats', { headers: { origin } });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.errorCode, 'CORS_ORIGIN_DENIED');
+    assert.match(res.body.requestId, /^[0-9a-f-]{36}$/);
+    assert.equal(res.headers.get('x-request-id'), res.body.requestId);
+  });
+
   test('Prisma codes map to the documented status and error code', () => {
     assert.equal(mapPrismaError({ code: 'P2002' }).statusCode, 409);
     assert.equal(mapPrismaError({ code: 'P2002' }).errorCode, 'CONFLICT');

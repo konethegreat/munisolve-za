@@ -10,7 +10,6 @@ const router = express.Router();
 
 const { authenticate } = require('../middleware/auth.middleware');
 const { superAdminOnly } = require('../middleware/authz.middleware');
-const { generalLimiter } = require('../middleware/rateLimit.middleware'); // imported, not defined here
 
 // ==========================================
 // PLACEHOLDER ROUTES
@@ -24,7 +23,6 @@ const { generalLimiter } = require('../middleware/rateLimit.middleware'); // imp
  */
 router.get(
   '/',
-  generalLimiter,   // shared limiter
   authenticate,
   superAdminOnly,
   (req, res) => {
