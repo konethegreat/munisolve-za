@@ -23,6 +23,8 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npm audit --audit-level=low
+      - run: npm run typecheck
+      - run: npm run build
       - run: npm test
 
   postgres-workflow:

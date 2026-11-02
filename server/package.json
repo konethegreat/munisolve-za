@@ -4,11 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node src/server.js",
-    "test": "node --test",
-    "demo": "node scripts/demo.js",
-    "demo:verify": "node scripts/demo.js --verify",
-    "dev": "node --watch src/server.js",
+    "start": "node dist/server.js",
+    "test": "node --import tsx --test",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "demo": "tsx scripts/demo.js",
+    "demo:verify": "tsx scripts/demo.js --verify",
+    "dev": "tsx watch src/server.js",
     "postinstall": "prisma generate",
     "prisma": "prisma",
     "db:generate": "prisma generate",
@@ -39,8 +41,11 @@
     "google-auth-library": "^10.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
     "prisma": "^6.19.3",
-    "resend": "^6.12.4"
+    "resend": "^6.12.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
