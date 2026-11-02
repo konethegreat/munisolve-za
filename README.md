@@ -60,14 +60,22 @@ GitHub Actions runs both dependency audits, API tests with stubbed external depe
 
 ## Regular local development
 
-Use your own development PostgreSQL database and untracked `server/.env` with `DATABASE_URL`, a random `JWT_SECRET`, `CLIENT_URL=http://localhost:5173` and `NODE_ENV=development`. Provider credentials are optional for basic reporting: without them AI chat is unavailable and email verification cannot deliver mail.
+Use your own development PostgreSQL database and untracked `server/.env` with `DATABASE_URL`, `DIRECT_URL`, a random `JWT_SECRET`, `CLIENT_URL=http://localhost:5173` and `NODE_ENV=development`.
 
 ```sh
-npm --prefix server run db:push
+DATABASE_URL=postgresql://user:password@localhost:5432/munisolve
+# Non-pooled Neon URL used by migrations; equals DATABASE_URL for a local Postgres.
+DIRECT_URL=postgresql://user:password@localhost:5432/munisolve
+```
+
+`schema.prisma` reads both variables, so the Prisma commands fail with P1012 if only `DATABASE_URL` is set. Provider credentials are optional for basic reporting: without them AI chat is unavailable and email verification cannot deliver mail.
+
+```sh
+npm --prefix server run db:deploy
 npm --prefix server run dev
 ```
 
-In another terminal, run `npm --prefix client run dev`. The client defaults to `http://localhost:5000/api`; use `VITE_API_URL` to change it. Configure `VITE_GOOGLE_CLIENT_ID` and matching server `GOOGLE_CLIENT_ID` to enable Google sign-in. `npm --prefix server run db:push` remains available as a local convenience for a disposable database, but the tracked schema history lives in `server/prisma/migrations`.
+`db:deploy` applies the tracked migrations in `server/prisma/migrations` to your disposable development database. In another terminal, run `npm --prefix client run dev`. The client defaults to `http://localhost:5000/api`; use `VITE_API_URL` to change it. Configure `VITE_GOOGLE_CLIENT_ID` and matching server `GOOGLE_CLIENT_ID` to enable Google sign-in. `npm --prefix server run db:push` remains available as a local convenience for a disposable database, but it skips the tracked migration history; use `db:deploy` whenever migration state matters.
 
 The server runs under `tsx watch` and restarts when imported source files change. Restart it manually after changing environment variables or the Prisma schema.
 
@@ -109,7 +117,7 @@ Status changes run through one transaction-backed state machine:
 | `CLOSED` | `IN_PROGRESS` (reopen) |
 | `REJECTED` | `PENDING` (reopen) |
 
-Invalid transitions return 409 `INVALID_TRANSITION`. Citizens can only resolve their own `PENDING` or `IN_PROGRESS` reports; a supervisor resolution requires an after-photo URL; a `SUPER_ADMIN` override requires a reason of at least 10 characters. Every change writes a `ReportStatusHistory` row and keeps the existing `ActivityLog` action names.
+Invalid transitions return 409 `INVALID_TRANSITION`. Assignment and reassignment go through `PATCH /api/supervisor/reports/:id/assign`; the status endpoints reject `ASSIGNED` with 400 `ASSIGNMENT_REQUIRED`. Citizens can only resolve their own `PENDING` or `IN_PROGRESS` reports; a supervisor resolution requires an after-photo URL; a `SUPER_ADMIN` override requires a reason of at least 10 characters. Every change writes a `ReportStatusHistory` row and keeps the existing `ActivityLog` action names.
 
 `GET /health` is a DB-free liveness probe used by Render and the keep-alive monitor, so it does not wake Neon. `GET /ready` checks the database and the migrations table and returns 200 with `database: "up"` and `migrations: "current"`, or 503.
 

@@ -240,7 +240,7 @@ POST   /chat              body: { reportId, message, history: [{role, content}] 
 GET    /dashboard                   aggregate stats
 GET    /reports                     all reports
 GET    /reports/:id                 single
-PATCH  /reports/:id/status          update status (valid: PENDING|ASSIGNED|IN_PROGRESS|RESOLVED|REJECTED|CLOSED)
+PATCH  /reports/:id/status          update status (valid: PENDING|IN_PROGRESS|RESOLVED|REJECTED|CLOSED; assign with PATCH /api/supervisor/reports/:id/assign)
 DELETE /reports/:id
 
 GET    /users                       all users
@@ -323,7 +323,7 @@ CLOSED → IN_PROGRESS (reopen)
 REJECTED → PENDING (reopen)
 ```
 
-Assignment goes through `PATCH /api/supervisor/reports/:id/assign`; the status endpoint rejects `ASSIGNED`. The canonical matrix and role gates live in `server/src/domain/reportStateMachine.ts`, and every transition is written with history and an activity row in `server/src/services/report.service.ts`. `SUPER_ADMIN` may force any transition with a reason of at least 10 characters, audited as `OVERRIDE_STATUS`.
+Assignment goes through `PATCH /api/supervisor/reports/:id/assign`; the status endpoint rejects `ASSIGNED`. The canonical matrix and role gates live in `server/src/domain/reportStateMachine.ts`, and every transition is written with history and an activity row in `server/src/services/report.service.ts`. A `WORKER_SUPERVISOR` transition to `RESOLVED` requires an after-photo URL from the request body or the existing record, otherwise it fails with 400 `AFTER_PHOTO_REQUIRED`. `SUPER_ADMIN` may force any transition with a reason of at least 10 characters, audited as `OVERRIDE_STATUS`.
 
 Proximity matching in `getTeamSuggestions`: Haversine distance + category→specialization keyword scoring. Teams sorted by `specScore * 10 + muniMatch * 5 - distanceKm`.
 
@@ -334,6 +334,7 @@ Proximity matching in `getTeamSuggestions`: Haversine distance + category→spec
 ### Server (`server/.env`)
 ```
 DATABASE_URL=          # Neon PostgreSQL connection string
+DIRECT_URL=            # Non-pooled Neon URL used by migrations; equals DATABASE_URL for a local Postgres
 JWT_SECRET=            # Long random string
 JWT_EXPIRES_IN=24h     # Optional, defaults to 24h
 ANTHROPIC_API_KEY=     # Claude API key for Siyanda
@@ -413,7 +414,7 @@ npx prisma migrate resolve --applied 20261102000000_baseline
 - **Google OAuth** — uses explicit `findUnique` + `update/create` instead of `upsert`. The upsert caused Prisma "invalid invocation" errors due to dual unique fields (`email` + `googleId`). Do not revert to upsert.
 - **Google JWT payload** — signed as `{ userId, email, role }`. The `googleLogin` handler previously used `{ id }` which broke `auth.middleware.js` (reads `decoded.userId`). Fixed.
 - **Email OTP** — stored as a SHA-256 hash in `emailVerifToken`. Compared using `crypto.timingSafeEqual` to prevent timing attacks. Google users skip verification (`isVerified: true` on create/update).
-- **afterPhotoUrl enforcement** — the `/supervisor/reports/:id/status` endpoint blocks `RESOLVED` if neither the request body nor the existing record has `afterPhotoUrl`. This is enforced in `supervisor.controller.js`, not at the DB level.
+- **afterPhotoUrl enforcement** — a `WORKER_SUPERVISOR` transition to `RESOLVED` is rejected with 400 `AFTER_PHOTO_REQUIRED` if neither the request body nor the existing record has `afterPhotoUrl`. The gate lives in `server/src/domain/reportStateMachine.ts:69`; `server/src/services/report.service.ts` runs it and writes the status, history and activity rows in one transaction. It is not a database constraint.
 - **Weather data** is embedded into the Report row at creation time via `weather.service.js` — it is a snapshot, not live.
 - **Siyanda chat** passes full `history[]` array on every request — the backend is stateless, the frontend owns conversation state.
 - **Public stats endpoint** caches in-memory (not Redis) — restarts clear the cache. TTL: 1 min.

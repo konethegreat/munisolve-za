@@ -4,7 +4,7 @@
 // workflow (citizen -> supervisor -> admin) can be tried on a throwaway database:
 //
 //   cd server
-//   npm run db:push
+//   npm run db:deploy       # or: npx prisma migrate deploy — disposable database only
 //   DEMO_PASSWORD='a-long-passphrase' npm run db:seed:demo
 //
 // Safety rails:
