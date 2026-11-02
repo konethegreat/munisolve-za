@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" SERIAL NOT NULL,
@@ -11,6 +14,8 @@ CREATE TABLE "User" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
     "lastLogin" TIMESTAMP(3),
+    "emailVerifToken" TEXT,
+    "emailVerifExpiry" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
@@ -32,6 +37,20 @@ CREATE TABLE "ActivityLog" (
 );
 
 -- CreateTable
+CREATE TABLE "Team" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "specialization" TEXT NOT NULL,
+    "municipality" TEXT,
+    "latitude" DOUBLE PRECISION,
+    "longitude" DOUBLE PRECISION,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Team_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Report" (
     "id" SERIAL NOT NULL,
     "title" TEXT NOT NULL,
@@ -47,6 +66,9 @@ CREATE TABLE "Report" (
     "weatherRainfall" DOUBLE PRECISION,
     "weatherWind" DOUBLE PRECISION,
     "weatherHumidity" DOUBLE PRECISION,
+    "assignedTeamId" INTEGER,
+    "assignedAt" TIMESTAMP(3),
+    "afterPhotoUrl" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "userId" INTEGER NOT NULL,
@@ -64,4 +86,8 @@ CREATE UNIQUE INDEX "User_googleId_key" ON "User"("googleId");
 ALTER TABLE "ActivityLog" ADD CONSTRAINT "ActivityLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Report" ADD CONSTRAINT "Report_assignedTeamId_fkey" FOREIGN KEY ("assignedTeamId") REFERENCES "Team"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Report" ADD CONSTRAINT "Report_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+

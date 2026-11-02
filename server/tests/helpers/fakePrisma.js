@@ -6,16 +6,18 @@
 // so a controller change that needs a new shape fails loudly here instead of passing silently.
 // The behaviours the tests lean on mirror Prisma's: unique violations (P2002), missing rows on
 // update/delete (P2025), foreign-key violations (P2003), required-field and NaN-id validation errors,
-// the RESTRICT on deleting a user who still has reports, and the cascade of a deleted user's activity
-// logs. These were checked against Prisma 6.19 and PostgreSQL while writing the tests.
+// the RESTRICT on deleting a user who still has reports, the cascade of a deleted user's activity
+// logs, and the cascade of a deleted report's status history. These were checked against Prisma 6.19
+// and PostgreSQL while writing the tests.
 
-const MODELS = ['user', 'report', 'team', 'activityLog'];
+const MODELS = ['user', 'report', 'team', 'activityLog', 'reportStatusHistory'];
 
 const REQUIRED = {
   user: ['email', 'password', 'firstName', 'lastName'],
   report: ['title', 'description', 'category', 'municipality', 'userId'],
   team: ['name', 'specialization'],
   activityLog: ['userId', 'action', 'entity', 'entityId'],
+  reportStatusHistory: ['reportId', 'toStatus'],
 };
 
 const RELATIONS = {
@@ -24,8 +26,10 @@ const RELATIONS = {
   report: {
     user: { model: 'user', fk: 'userId', many: false },
     team: { model: 'team', fk: 'assignedTeamId', many: false },
+    history: { model: 'reportStatusHistory', fk: 'reportId', many: true },
   },
   activityLog: { user: { model: 'user', fk: 'userId', many: false } },
+  reportStatusHistory: { report: { model: 'report', fk: 'reportId', many: false } },
 };
 
 const DEFAULTS = {
@@ -52,9 +56,19 @@ const DEFAULTS = {
     assignedTeamId: null,
     assignedAt: null,
     afterPhotoUrl: null,
+    resolvedAt: null,
+    closedAt: null,
+    reopenCount: 0,
   }),
   team: () => ({ municipality: null, latitude: null, longitude: null, isActive: true }),
   activityLog: () => ({ description: null, ipAddress: null, userAgent: null }),
+  reportStatusHistory: () => ({
+    fromStatus: null,
+    actorId: null,
+    actorRole: null,
+    note: null,
+    requestId: null,
+  }),
 };
 
 function prismaError(code, message) {
@@ -162,6 +176,9 @@ function createFakePrisma() {
         throw prismaError('P2003', 'Foreign key constraint violated on `assignedTeamId`');
       }
     }
+    if (model === 'reportStatusHistory' && !tables.report.some((r) => r.id === data.reportId)) {
+      throw prismaError('P2003', 'Foreign key constraint violated on `reportId`');
+    }
 
     counters[model] += 1;
     const timestamp = now();
@@ -259,7 +276,14 @@ function createFakePrisma() {
       async update({ where, data, ...projection }) {
         const row = requireOne(model, where);
         for (const [key, value] of Object.entries(data)) {
-          if (value !== undefined) row[key] = value;
+          if (value === undefined) continue;
+          if (value && typeof value === 'object' && typeof value.increment === 'number') {
+            row[key] = (row[key] ?? 0) + value.increment;
+          } else if (value && typeof value === 'object' && typeof value.decrement === 'number') {
+            row[key] = (row[key] ?? 0) - value.decrement;
+          } else {
+            row[key] = value;
+          }
         }
         if (model === 'report') row.updatedAt = now();
         return project(model, row, projection);
@@ -274,6 +298,9 @@ function createFakePrisma() {
             throw error;
           }
           tables.activityLog = tables.activityLog.filter((log) => log.userId !== row.id);
+        }
+        if (model === 'report') {
+          tables.reportStatusHistory = tables.reportStatusHistory.filter((history) => history.reportId !== row.id);
         }
         tables[model] = tables[model].filter((r) => r !== row);
         return project(model, row);
@@ -291,6 +318,18 @@ function createFakePrisma() {
 
   db.$connect = async () => {};
   db.$disconnect = async () => {};
+
+  // Runs the callback against this client (or resolves the promises) inside one "transaction".
+  // There is no rollback: tests assert on committed state, not on aborted work.
+  db.$transaction = async (arg) => (typeof arg === 'function' ? arg(db) : Promise.all(arg));
+
+  // Raw SQL never touches a database; tests can set `queryRawOverride` to inspect the query.
+  db.$queryRaw = async (strings) => {
+    if (db.queryRawOverride) return db.queryRawOverride(strings);
+    const sql = Array.isArray(strings) ? strings.join('?') : String(strings);
+    if (sql.includes('_prisma_migrations')) return [{ failed: 0 }];
+    return [{ ok: 1 }];
+  };
 
   // Test helpers (not part of the Prisma API).
   db.reset = reset;

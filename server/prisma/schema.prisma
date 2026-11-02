@@ -3,28 +3,30 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  // prisma-ignore
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id         Int      @id @default(autoincrement())
-  email      String   @unique
-  password   String
-  firstName  String
-  lastName   String
-  googleId      String?  @unique
-  phone      String?
-  role              String    @default("CITIZEN")
-  isActive          Boolean   @default(true)
-  isVerified        Boolean   @default(false)
-  lastLogin         DateTime?
-  emailVerifToken   String?
-  emailVerifExpiry  DateTime?
-  createdAt         DateTime  @default(now())
-  reports           Report[]
-  activityLogs      ActivityLog[]
+  id               Int          @id @default(autoincrement())
+  email            String       @unique
+  password         String
+  firstName        String
+  lastName         String
+  googleId         String?      @unique
+  phone            String?
+  role             String       @default("CITIZEN")
+  isActive         Boolean      @default(true)
+  isVerified       Boolean      @default(false)
+  lastLogin        DateTime?
+  emailVerifToken  String?
+  emailVerifExpiry DateTime?
+  createdAt        DateTime     @default(now())
+  reports          Report[]
+  activityLogs     ActivityLog[]
+
+  @@index([role, isActive])
 }
 
 model ActivityLog {
@@ -37,7 +39,11 @@ model ActivityLog {
   description String?
   ipAddress   String?
   userAgent   String?
+  requestId   String?
   createdAt   DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId, createdAt])
 }
 
 model Team {
@@ -50,10 +56,12 @@ model Team {
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   reports        Report[]
+
+  @@index([isActive])
 }
 
 model Report {
-  id               Int       @id @default(autoincrement())
+  id               Int                   @id @default(autoincrement())
   title            String
   description      String
   category         String
@@ -61,18 +69,41 @@ model Report {
   address          String?
   latitude         Float?
   longitude        Float?
-  status           String    @default("PENDING")
+  status           String                @default("PENDING")
   weatherTemp      Float?
   weatherCondition String?
   weatherRainfall  Float?
   weatherWind      Float?
   weatherHumidity  Float?
   assignedTeamId   Int?
-  team             Team?     @relation(fields: [assignedTeamId], references: [id])
+  team             Team?                 @relation(fields: [assignedTeamId], references: [id])
   assignedAt       DateTime?
   afterPhotoUrl    String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  resolvedAt       DateTime?
+  closedAt         DateTime?
+  reopenCount      Int                   @default(0)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
   userId           Int
-  user             User      @relation(fields: [userId], references: [id])
+  user             User                  @relation(fields: [userId], references: [id])
+  history          ReportStatusHistory[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([assignedTeamId, status])
+}
+
+model ReportStatusHistory {
+  id         Int      @id @default(autoincrement())
+  reportId   Int
+  report     Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  actorId    Int?
+  actorRole  String?
+  note       String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([reportId, createdAt])
 }
