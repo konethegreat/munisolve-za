@@ -13,6 +13,7 @@
 
 const Module = require('node:module');
 const path = require('node:path');
+const fs = require('node:fs');
 const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -45,6 +46,16 @@ function stubModule(resolvedPath, exports) {
 
 const appPath = (relative) => path.join(SERVER_ROOT, relative);
 const packagePath = (name) => require.resolve(name, { paths: [SERVER_ROOT] });
+
+// Source modules are TypeScript. Allow callers to keep naming the historical
+// `.js` path while the stub is filed under the file the app actually loads.
+const sourcePath = (relative) => {
+  const jsPath = appPath(relative);
+  if (fs.existsSync(jsPath)) return jsPath;
+  const tsPath = jsPath.replace(/\.js$/, '.ts');
+  if (fs.existsSync(tsPath)) return tsPath;
+  throw new Error(`Test harness cannot resolve source module: ${relative}`);
+};
 
 function quietConsole() {
   if (process.env.TEST_VERBOSE) return;
@@ -88,8 +99,8 @@ async function startApp() {
     }
   }
 
-  stubModule(appPath('src/config/db.config.js'), db);
-  stubModule(appPath('src/services/email.service.js'), {
+  stubModule(sourcePath('src/config/db.config.js'), db);
+  stubModule(sourcePath('src/services/email.service.js'), {
     sendVerificationEmail: async (...args) => {
       email.sent.push(args);
     },
@@ -98,13 +109,13 @@ async function startApp() {
     },
     isEmailConfigured: () => true,
   });
-  stubModule(appPath('src/services/weather.service.js'), {
+  stubModule(sourcePath('src/services/weather.service.js'), {
     getWeatherForLocation: async (lat, lon) => {
       weather.calls.push([lat, lon]);
       return weather.result;
     },
   });
-  stubModule(appPath('src/services/geo.service.js'), {
+  stubModule(sourcePath('src/services/geo.service.js'), {
     searchPlaces: async (query, options) => {
       geo.searches.push([query, options]);
       return {
@@ -152,7 +163,7 @@ async function startApp() {
   stubModule(packagePath('@anthropic-ai/sdk'), FakeAnthropic);
   stubModule(packagePath('google-auth-library'), { OAuth2Client: FakeOAuth2Client });
 
-  const app = require(appPath('src/server.js'));
+  const app = require(sourcePath('src/server.js'));
   const server = await new Promise((resolve) => {
     const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
   });

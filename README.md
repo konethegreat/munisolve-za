@@ -23,7 +23,7 @@ Transitions are enforced server-side by the table below; an invalid move returns
 
 | Layer | Technology |
 |---|---|
-| Runtime | Node.js 22.12+; Express 5 |
+| Runtime | TypeScript 5.9; Node.js 22.12+; Express 5 |
 | Data | PostgreSQL; Prisma 6 |
 | Interface | React 19; Vite 7; Tailwind CSS 4; React Router 7 |
 | Maps | Leaflet; React Leaflet; OpenStreetMap |
@@ -51,13 +51,14 @@ For the interactive interface, set a temporary `DEMO_PASSWORD` of at least 12 ch
 ```sh
 npm --prefix server audit --audit-level=low
 npm --prefix client audit --audit-level=low
+npm --prefix server run typecheck
 npm --prefix server test
 npm --prefix server run demo:verify
 npm --prefix client run lint
 npm --prefix client run build
 ```
 
-GitHub Actions runs both dependency audits, API tests with stubbed external dependencies, the actual PostgreSQL HTTP workflow, and client lint/build. Audits include development dependencies and fail on findings of any severity. The browser walkthrough is a separate manual check; CI does not automate the UI.
+GitHub Actions runs both dependency audits, the server typecheck and build, API tests with stubbed external dependencies, the actual PostgreSQL HTTP workflow, and client lint/build. Audits include development dependencies and fail on findings of any severity. The browser walkthrough is a separate manual check; CI does not automate the UI.
 
 ## Regular local development
 
@@ -120,7 +121,9 @@ Status changes run through one transaction-backed state machine:
 
 Invalid transitions return 409 `INVALID_TRANSITION`. Assignment and reassignment go through `PATCH /api/supervisor/reports/:id/assign`; the status endpoints reject `ASSIGNED` with 400 `ASSIGNMENT_REQUIRED`. Citizens can only resolve their own `PENDING` or `IN_PROGRESS` reports; a supervisor resolution requires an after-photo URL; a `SUPER_ADMIN` override requires a reason of at least 10 characters. Every change writes a `ReportStatusHistory` row and keeps the existing `ActivityLog` action names.
 
-`GET /health` is a DB-free liveness probe used by Render and the keep-alive monitor, so it does not wake Neon. `GET /ready` checks the database and the migrations table and returns 200 with `database: "up"` and `migrations: "current"`, or 503.
+`GET /health` is a DB-free liveness probe used by Render and the keep-alive monitor, so it does not wake Neon. `.github/workflows/keep-api-awake.yml` pings it every 10 minutes to keep the free Render service warm; `/health` never queries PostgreSQL, so Neon compute can still auto-suspend. `GET /ready` checks the database and the migrations table and returns 200 with `database: "up"` and `migrations: "current"`, or 503.
+
+Deploy, rollback, backup/restore and incident procedures are in [the operations runbook](docs/OPERATIONS.md).
 
 `DATABASE_URL` is the pooled Neon connection string used by the API. `DIRECT_URL` is the direct Neon URL used only by migrations.
 

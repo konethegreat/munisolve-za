@@ -6,11 +6,11 @@
   "scripts": {
     "start": "node dist/server.js",
     "test": "node --import tsx --test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
     "build": "tsc",
-    "demo": "tsx scripts/demo.js",
-    "demo:verify": "tsx scripts/demo.js --verify",
-    "dev": "tsx watch src/server.js",
+    "demo": "tsx scripts/demo.ts",
+    "demo:verify": "tsx scripts/demo.ts --verify",
+    "dev": "tsx watch src/server.ts",
     "postinstall": "prisma generate",
     "prisma": "prisma",
     "db:generate": "prisma generate",
@@ -19,8 +19,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seedAdmin.js",
-    "db:seed:demo": "tsx prisma/seedDemo.js"
+    "db:seed": "tsx prisma/seedAdmin.ts",
+    "db:seed:demo": "tsx prisma/seedDemo.ts"
   },
   "keywords": [],
   "author": "",
