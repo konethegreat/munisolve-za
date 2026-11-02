@@ -55,4 +55,40 @@ describe('request validation', () => {
     assert.equal(res.body.errorCode, 'VALIDATION_ERROR');
     assert.equal(res.body.errors[0].field, 'id');
   });
+
+  test('report creation returns field errors and strips ownership and status', async () => {
+    const user = h.makeUser();
+    const bad = await h.api('POST', '/api/reports', {
+      token: h.tokenFor(user),
+      body: { title: 'short', description: 'short', category: 'NOT_A_CATEGORY', municipality: 'J' },
+    });
+
+    assert.equal(bad.status, 400);
+    assert.equal(bad.body.errorCode, 'VALIDATION_ERROR');
+    assert.ok(bad.body.errors.some((error) => error.field === 'title'));
+    assert.ok(bad.body.errors.some((error) => error.field === 'category'));
+
+    const good = await h.api('POST', '/api/reports', {
+      token: h.tokenFor(user),
+      body: {
+        title: 'Pothole on Validation Road',
+        description: 'A deep pothole that needs a proper patch.',
+        category: 'POTHOLE',
+        municipality: 'City of Johannesburg',
+        status: 'RESOLVED',
+        userId: user.id + 99,
+      },
+    });
+    assert.equal(good.status, 201);
+    assert.equal(good.body.data.status, 'PENDING');
+    assert.equal(good.body.data.userId, user.id);
+  });
+
+  test('report list queries reject an out-of-range limit', async () => {
+    const user = h.makeUser();
+    const res = await h.api('GET', '/api/reports?limit=101', { token: h.tokenFor(user) });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.errorCode, 'VALIDATION_ERROR');
+  });
 });

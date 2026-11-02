@@ -2,122 +2,106 @@
 // REPORT CONTROLLER (with status updates)
 // ==========================================
 const prisma = require('../config/db.config');
+const { AppError } = require('../errors/AppError');
 const { generateAutoResponse } = require('./ai.controller');
 const { getWeatherForLocation } = require('../services/weather.service');
 
 const createReport = async (req, res) => {
-  try {
-    const { title, description, category, municipality, address, latitude, longitude } = req.body;
-    const userId = req.user.id;
+  const { title, description, category, municipality, address, latitude, longitude } = req.validated.body;
+  const userId = req.user.id;
 
-    // Fetch weather data if coordinates are provided
-    let weatherData = null;
-    if (latitude && longitude) {
-      weatherData = await getWeatherForLocation(parseFloat(latitude), parseFloat(longitude));
-    }
-
-    const report = await prisma.report.create({
-      data: {
-        title,
-        description,
-        category,
-        municipality,
-        ...(address !== undefined && { address }),
-        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
-        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
-        ...(weatherData && {
-          weatherTemp: weatherData.weatherTemp,
-          weatherCondition: weatherData.weatherCondition,
-          weatherRainfall: weatherData.weatherRainfall,
-          weatherWind: weatherData.weatherWind,
-          weatherHumidity: weatherData.weatherHumidity,
-        }),
-        status: 'PENDING',
-        userId,
-      },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-    });
-
-    let aiResponse = null;
+  // Fetch weather data if coordinates are provided
+  let weatherData = null;
+  if (latitude !== undefined && longitude !== undefined) {
     try {
-      aiResponse = await generateAutoResponse(report, req.user);
-    } catch { /* Don't fail if AI is down */ }
-
-    await prisma.activityLog.create({
-      data: {
-        userId, action: 'CREATE_REPORT', entity: 'Report', entityId: report.id,
-        description: `Report created: ${title}`, ipAddress: req.ip, userAgent: req.get('User-Agent'),
-      },
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Report created successfully',
-      data: { ...report, aiResponse },
-    });
-  } catch (error) {
-    console.error('[REPORT ERROR] Create failed:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create report.',
-      ...(process.env.NODE_ENV === 'development' && { debug: error.message }),
-    });
+      weatherData = await getWeatherForLocation(latitude, longitude);
+    } catch {
+      weatherData = null;
+    }
   }
+
+  const report = await prisma.report.create({
+    data: {
+      title,
+      description,
+      category,
+      municipality,
+      ...(address !== undefined && { address }),
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude }),
+      ...(weatherData && {
+        weatherTemp: weatherData.weatherTemp,
+        weatherCondition: weatherData.weatherCondition,
+        weatherRainfall: weatherData.weatherRainfall,
+        weatherWind: weatherData.weatherWind,
+        weatherHumidity: weatherData.weatherHumidity,
+      }),
+      status: 'PENDING',
+      userId,
+    },
+    include: {
+      user: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+  });
+
+  let aiResponse = null;
+  try {
+    aiResponse = await generateAutoResponse(report, req.user);
+  } catch { /* Don't fail if AI is down */ }
+
+  await prisma.activityLog.create({
+    data: {
+      userId, action: 'CREATE_REPORT', entity: 'Report', entityId: report.id,
+      description: `Report created: ${title}`, ipAddress: req.ip, userAgent: req.get('User-Agent'),
+    },
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Report created successfully',
+    data: { ...report, aiResponse },
+  });
 };
 
 const getAllReports = async (req, res) => {
-  try {
-    const { status, category, municipality } = req.query;
-    const userId = req.user.id;
-    const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(req.user.role);
+  const { status, category, municipality } = req.validated.query;
+  const userId = req.user.id;
+  const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(req.user.role);
 
-    // Admins see ALL reports, citizens see only their own
-    const where = isAdmin ? {} : { userId };
-    if (status) where.status = status;
-    if (category) where.category = category;
-    if (municipality) where.municipality = municipality;
+  // Admins see ALL reports, citizens see only their own
+  const where = isAdmin ? {} : { userId };
+  if (status) where.status = status;
+  if (category) where.category = category;
+  if (municipality) where.municipality = municipality;
 
-    const reports = await prisma.report.findMany({
-      where,
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  const reports = await prisma.report.findMany({
+    where,
+    include: {
+      user: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
 
-    res.status(200).json({ success: true, data: reports, count: reports.length });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to retrieve reports' });
-  }
+  res.status(200).json({ success: true, data: reports, count: reports.length });
 };
 
 const getReportById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
-    const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(req.user.role);
+  const id = req.validated.params.id;
+  const userId = req.user.id;
+  const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(req.user.role);
 
-    const where = isAdmin
-      ? { id: parseInt(id) }
-      : { id: parseInt(id), userId };
+  const where = isAdmin ? { id } : { id, userId };
 
-    const report = await prisma.report.findFirst({
-      where,
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-    });
+  const report = await prisma.report.findFirst({
+    where,
+    include: {
+      user: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+  });
 
-    if (!report) {
-      return res.status(404).json({ success: false, message: 'Report not found' });
-    }
+  if (!report) throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found');
 
-    res.status(200).json({ success: true, data: report });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to retrieve report' });
-  }
+  res.status(200).json({ success: true, data: report });
 };
 
 // ==========================================
@@ -218,50 +202,27 @@ const updateStatus = async (req, res) => {
 };
 
 const updateReport = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
-    const { title, description, category, municipality, address, latitude, longitude } = req.body;
+  const id = req.validated.params.id;
+  const userId = req.user.id;
 
-    const existing = await prisma.report.findFirst({ where: { id: parseInt(id), userId } });
-    if (!existing) {
-      return res.status(404).json({ success: false, message: 'Report not found' });
-    }
+  const existing = await prisma.report.findFirst({ where: { id, userId } });
+  if (!existing) throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found');
 
-    const updated = await prisma.report.update({
-      where: { id: parseInt(id) },
-      data: {
-        ...(title && { title }),
-        ...(description && { description }),
-        ...(category && { category }),
-        ...(municipality && { municipality }),
-        ...(address !== undefined && { address }),
-        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
-        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
-      },
-    });
+  const data = { ...req.validated.body };
+  const updated = await prisma.report.update({ where: { id }, data });
 
-    res.status(200).json({ success: true, message: 'Report updated', data: updated });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to update report' });
-  }
+  res.status(200).json({ success: true, message: 'Report updated', data: updated });
 };
 
 const deleteReport = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
+  const id = req.validated.params.id;
+  const userId = req.user.id;
 
-    const existing = await prisma.report.findFirst({ where: { id: parseInt(id), userId } });
-    if (!existing) {
-      return res.status(404).json({ success: false, message: 'Report not found' });
-    }
+  const existing = await prisma.report.findFirst({ where: { id, userId } });
+  if (!existing) throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found');
 
-    await prisma.report.delete({ where: { id: parseInt(id) } });
-    res.status(200).json({ success: true, message: 'Report deleted' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to delete report' });
-  }
+  await prisma.report.delete({ where: { id } });
+  res.status(200).json({ success: true, message: 'Report deleted' });
 };
 
 module.exports = { createReport, getAllReports, getReportById, updateStatus, updateReport, deleteReport };

@@ -164,13 +164,13 @@ describe('reports', () => {
 
       const res = await h.api('PUT', `/api/reports/${report.id}`, {
         token: as(alice),
-        body: { title: 'Updated title', description: 'Updated description', status: 'RESOLVED', userId: bob.id },
+        body: { title: 'Updated title', description: 'Updated description for the report', status: 'RESOLVED', userId: bob.id },
       });
 
       assert.equal(res.status, 200);
       assert.equal(res.body.data.title, 'Updated title');
       const stored = reportRow(report.id);
-      assert.equal(stored.description, 'Updated description');
+      assert.equal(stored.description, 'Updated description for the report');
       assert.equal(stored.status, 'PENDING');
       assert.equal(stored.userId, alice.id);
     });
@@ -179,7 +179,7 @@ describe('reports', () => {
       const report = h.makeReport(alice);
       const untouched = h.db.snapshot();
 
-      const edit = await h.api('PUT', `/api/reports/${report.id}`, { token: as(bob), body: { title: 'Defaced' } });
+      const edit = await h.api('PUT', `/api/reports/${report.id}`, { token: as(bob), body: { title: 'Defaced by another citizen' } });
       const remove = await h.api('DELETE', `/api/reports/${report.id}`, { token: as(bob) });
 
       assert.equal(edit.status, 404);
@@ -257,7 +257,9 @@ describe('reports', () => {
       const res = await h.api('PATCH', `/api/reports/${report.id}/status`, { token: as(admin), body: { status: 'DONE' } });
 
       assert.equal(res.status, 400);
-      assert.match(res.body.message, /Must be one of: PENDING, ASSIGNED, IN_PROGRESS, RESOLVED, REJECTED, CLOSED/);
+      assert.equal(res.body.errorCode, 'VALIDATION_ERROR');
+      assert.ok(res.body.errors.some((error) => error.field === 'status'));
+      assert.equal(reportRow(report.id).status, 'PENDING');
     });
 
     test('an admin can set any status, from either admin endpoint, and the owner sees it', async () => {
