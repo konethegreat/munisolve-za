@@ -226,6 +226,25 @@ describe('report transitions', () => {
     assert.equal(h.db.tables.report.find((row) => row.id === report.id).reopenCount, 1);
   });
 
+  test('a reopen resets the resolution window and starts a new SLA cycle', async () => {
+    const longAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const report = h.makeReport(citizen, {
+      status: 'RESOLVED',
+      resolutionDueAt: longAgo,
+      slaCycleStartedAt: longAgo,
+    });
+
+    const res = await h.api('PATCH', `/api/admin/reports/${report.id}/status`, {
+      token: as(admin),
+      body: { status: 'IN_PROGRESS' },
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.reopenCount, 1);
+    assert.ok(new Date(res.body.data.resolutionDueAt).getTime() > Date.now() + 13 * 24 * 60 * 60 * 1000);
+    assert.ok(new Date(res.body.data.slaCycleStartedAt).getTime() > Date.now() - 60 * 1000);
+  });
+
   test('a forced CLOSED to REJECTED clears resolvedAt', async () => {
     const resolvedAt = new Date('2026-10-01T08:00:00.000Z');
     const report = h.makeReport(citizen, { status: 'CLOSED', resolvedAt, closedAt: resolvedAt });

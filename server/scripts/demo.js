@@ -23,6 +23,7 @@ const env = {
   NODE_ENV: 'test',
   JWT_SECRET: randomBytes(32).toString('hex'),
   JWT_EXPIRES_IN: '1h',
+  TICK_SECRET: randomBytes(16).toString('hex'),
   DEMO_PASSWORD: verify ? `${randomBytes(20).toString('hex')}Aa1!` : requirePassword(),
   POSTGRES_PASSWORD: randomBytes(24).toString('hex'),
   ANTHROPIC_API_KEY: '', ANTHROPIC_AUTH_TOKEN: '', RESEND_API_KEY: '',
@@ -107,7 +108,7 @@ async function main() {
   }, 'demo API');
   const baseURL = `http://127.0.0.1:${env.PORT}/api`;
   if (verify) {
-    await verifyWorkflow(baseURL, env.DEMO_PASSWORD);
+    await verifyWorkflow(baseURL, env.DEMO_PASSWORD, env.TICK_SECRET);
     return;
   }
   env.VITE_API_URL = baseURL;

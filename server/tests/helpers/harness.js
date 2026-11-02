@@ -28,6 +28,7 @@ const SERVER_ROOT = path.resolve(__dirname, '..', '..');
 // Generate credentials for this test process; no reusable credential belongs in source.
 const TEST_JWT_SECRET = crypto.randomBytes(32).toString('hex');
 const TEST_PASSWORD = `${crypto.randomBytes(16).toString('hex')}Aa1!`;
+const TEST_TICK_SECRET = crypto.randomBytes(16).toString('hex');
 const TEST_CLIENT_ORIGIN = 'https://client.example.test';
 
 // Cost 4 keeps the suite fast; the app's bcrypt.compare works with any cost.
@@ -57,6 +58,7 @@ async function startApp() {
   quietConsole();
 
   process.env.JWT_SECRET = TEST_JWT_SECRET;
+  process.env.TICK_SECRET = TEST_TICK_SECRET;
   // Only the stub sees this synthetic value; the real SDK is replaced below.
   process.env.ANTHROPIC_API_KEY = 'synthetic-test-only';
   process.env.CLIENT_URL = `${TEST_CLIENT_ORIGIN}/`;
@@ -64,7 +66,7 @@ async function startApp() {
 
   const db = createFakePrisma();
   const anthropic = { calls: [], fail: false, reply: 'Stubbed assistant reply.' };
-  const email = { sent: [] };
+  const email = { sent: [], notifications: [] };
   const weather = { calls: [], result: null };
 
   class FakeAnthropic {
@@ -90,6 +92,10 @@ async function startApp() {
     sendVerificationEmail: async (...args) => {
       email.sent.push(args);
     },
+    sendNotificationEmail: async (message) => {
+      email.notifications.push(message);
+    },
+    isEmailConfigured: () => true,
   });
   stubModule(appPath('src/services/weather.service.js'), {
     getWeatherForLocation: async (lat, lon) => {
@@ -171,6 +177,7 @@ async function startApp() {
   function reset() {
     db.reset();
     email.sent.length = 0;
+    email.notifications.length = 0;
     weather.calls.length = 0;
     weather.result = null;
     anthropic.calls.length = 0;
@@ -195,6 +202,8 @@ async function startApp() {
     makeTeam,
     anthropic,
     email,
+    notifications: email.notifications,
+    tickSecret: TEST_TICK_SECRET,
     weather,
     secret: TEST_JWT_SECRET,
     password: TEST_PASSWORD,

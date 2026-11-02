@@ -50,6 +50,10 @@ app.get('/', (_req, res) => {
 app.get('/health', liveness);
 app.get('/ready', readiness);
 
+// The internal router has its own limiter, so it is mounted before the global one.
+const internalRoutes = require('./routes/internal.routes');
+app.use('/api/internal', internalRoutes);
+
 // 4. One global API limiter
 app.use('/api/', generalLimiter);
 

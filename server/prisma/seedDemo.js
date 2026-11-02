@@ -161,18 +161,20 @@ async function ensureTeams(prisma) {
 }
 
 async function ensureReports(prisma, users, teams) {
+  const { slaWindowsForNewReport } = require('../src/services/sla.service');
   for (const r of DEMO_REPORTS) {
     const { owner, team, ...fields } = r;
     const userId = users[owner].id;
     const assignment = team
       ? { assignedTeamId: teams[team].id, assignedAt: new Date() }
       : { assignedTeamId: null, assignedAt: null };
+    const windows = await slaWindowsForNewReport(r.category, new Date(), prisma);
 
     const existing = await prisma.report.findFirst({ where: { userId, title: r.title } });
     if (existing) {
-      await prisma.report.update({ where: { id: existing.id }, data: { ...fields, ...assignment } });
+      await prisma.report.update({ where: { id: existing.id }, data: { ...fields, ...assignment, ...windows } });
     } else {
-      await prisma.report.create({ data: { ...fields, ...assignment, userId } });
+      await prisma.report.create({ data: { ...fields, ...assignment, ...windows, userId } });
     }
   }
 }

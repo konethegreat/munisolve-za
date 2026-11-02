@@ -123,6 +123,19 @@ Invalid transitions return 409 `INVALID_TRANSITION`. Assignment and reassignment
 
 `DATABASE_URL` is the pooled Neon connection string used by the API. `DIRECT_URL` is the direct Neon URL used only by migrations.
 
+## Scheduled SLA checks
+
+Reports carry a response target and a resolution target chosen by category. A tick finds reports approaching (80% of the window) or past those targets, writes one notification per report, cycle and recipient to the `NotificationOutbox` table, and emails through Resend with bounded retries.
+
+The tick is `POST /api/internal/tick` and requires the `x-tick-secret` header. `.github/workflows/sla-tick.yml` calls it hourly (`5 * * * *`). Hourly is deliberate: a five-minute tick would wake Neon's free compute continuously and exceed the monthly allowance. Detection is therefore up to one hour late, which is acceptable for targets measured in hours and days. GitHub disables scheduled workflows after 60 days without repository activity; use manual dispatch if that happens.
+
+Repository secrets required by the workflow:
+
+- `MUNISOLVE_API_URL` — the API origin, without a trailing slash.
+- `TICK_SECRET` — the same random value set on the Render service.
+
+Email delivery uses `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Without them the outbox marks rows `SKIPPED` instead of retrying forever. Policies are seeded in the migration; changing a target is a new migration.
+
 Local commands, from `server/`:
 
 ```sh
