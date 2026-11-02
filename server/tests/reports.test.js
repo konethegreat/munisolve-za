@@ -153,7 +153,8 @@ describe('reports', () => {
       const missing = await h.api('GET', '/api/reports/99999', { token: as(bob) });
 
       assert.equal(other.status, 404);
-      assert.deepEqual(other.body, missing.body);
+      assert.equal(other.body.errorCode, missing.body.errorCode);
+      assert.equal(other.body.message, missing.body.message);
     });
   });
 

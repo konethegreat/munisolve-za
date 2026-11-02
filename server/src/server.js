@@ -2,48 +2,47 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+
+const { requestId } = require('./middleware/requestId.middleware');
+const { httpLogger } = require('./logger');
+const { notFound } = require('./middleware/notFound.middleware');
+const { errorHandler } = require('./middleware/error.middleware');
+const { generalLimiter } = require('./middleware/rateLimit.middleware');
 
 const app = express();
 app.set('trust proxy', 1);
 
 // --- SECURITY MIDDLEWARE ---
 
+app.use(requestId);
+app.use(httpLogger);
+
 // 1. Helmet
 app.use(helmet());
 
 // 2. CORS
-// 2. CORS - Updated for better reliability
 const allowedOrigins = [
   'http://localhost:5173',
-  process.env.CLIENT_URL?.replace(/\/$/, "") // Removes trailing slash if present
-].filter(Boolean); // Removes undefined values
+  process.env.CLIENT_URL?.replace(/\/$/, ''),
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl) 
-    // or if the origin is in our allowed list
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log("Blocked by CORS:", origin); // Helps you debug in Render logs!
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
 }));
 
 // 3. JSON Parser
 app.use(express.json());
 
-// 4. Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: "Too many requests from this IP, please try again later."
-});
-app.use('/api/', limiter);
+// 4. One global API limiter
+app.use('/api/', generalLimiter);
 
 // --- HEALTH CHECK ---
 app.get('/', (req, res) => {
@@ -72,6 +71,11 @@ app.use('/api/ai',         aiRoutes);
 app.use('/api/admin',      adminRoutes);
 app.use('/api/public',     publicRoutes);
 app.use('/api/supervisor', supervisorRoutes);
+
+// --- ERROR HANDLING ---
+// Every unmatched route and every thrown error leaves through the one envelope.
+app.use(notFound);
+app.use(errorHandler);
 
 // --- SERVER START ---
 // Listen only when run directly (npm start / node src/server.js). The tests

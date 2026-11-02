@@ -9,6 +9,7 @@
 // Import express-validator functions
 // These provide comprehensive input validation and sanitization
 const { body, param, query, validationResult } = require('express-validator');
+const { AppError } = require('../errors/AppError');
 
 /**
  * ==========================================
@@ -61,20 +62,16 @@ const handleValidationErrors = (req, res, next) => {
   // Extract validation errors from request
   // validationResult() collects all errors from validation chains
   const errors = validationResult(req);
-  
+
   // Check if there are any validation errors
   if (!errors.isEmpty()) {
-    // Validation failed - return errors to client
-    
-    // Format errors for better readability
-    // errors.array() returns: [{ msg: '...', param: '...', location: '...' }, ...]
+    // Validation failed - hand the field messages to the error envelope.
+    // Only the field name and message travel: the submitted value is never echoed back.
     const formattedErrors = errors.array().map(error => ({
-      field: error.param,     // Which field has the error
-      message: error.msg,     // What's wrong with it
-      value: error.value,     // The invalid value (for debugging)
-      location: error.location // Where it was found (body, query, params)
+      field: error.path, // Which field has the error
+      message: error.msg, // What's wrong with it
     }));
-    
+
     // Log validation failure (helps with debugging and security monitoring)
     console.warn('[VALIDATION] Request failed validation:', {
       path: req.path,
@@ -84,18 +81,11 @@ const handleValidationErrors = (req, res, next) => {
       // But log which fields were submitted
       submittedFields: Object.keys(req.body || {})
     });
-    
-    // Return 400 Bad Request with detailed error information
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed. Please check your input.',
-      errorCode: 'VALIDATION_ERROR',
-      errors: formattedErrors,
-      // Count of errors (useful for frontend)
-      errorCount: formattedErrors.length
-    });
+
+    // Return 400 Bad Request through the one error envelope
+    return next(new AppError(400, 'VALIDATION_ERROR', 'Validation failed. Please check your input.', formattedErrors));
   }
-  
+
   // No validation errors - proceed to next middleware
   next();
 };

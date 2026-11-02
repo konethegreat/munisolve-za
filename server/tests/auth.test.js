@@ -51,7 +51,8 @@ describe('authentication', () => {
 
       assert.equal(wrongPassword.status, 401);
       assert.equal(wrongPassword.body.errorCode, 'INVALID_CREDENTIALS');
-      assert.deepEqual(unknownEmail.body, wrongPassword.body);
+      assert.equal(unknownEmail.body.errorCode, wrongPassword.body.errorCode);
+      assert.equal(unknownEmail.body.message, wrongPassword.body.message);
       assert.ok(h.db.tables.activityLog.some((log) => log.action === 'LOGIN_FAILED' && log.userId === user.id));
     });
 

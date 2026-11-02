@@ -18,6 +18,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createFakePrisma } = require('./fakePrisma');
 
+// Pin the environment at load time: a test file may import an application module (such as the
+// error middleware) before startApp() runs, and src/logger.ts chooses its level when it is
+// first imported. Setting this here keeps every test run's logger silent.
+process.env.NODE_ENV = 'test';
+
 const SERVER_ROOT = path.resolve(__dirname, '..', '..');
 
 // Generate credentials for this test process; no reusable credential belongs in source.
@@ -51,7 +56,6 @@ let ipCounter = 0;
 async function startApp() {
   quietConsole();
 
-  process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = TEST_JWT_SECRET;
   // Only the stub sees this synthetic value; the real SDK is replaced below.
   process.env.ANTHROPIC_API_KEY = 'synthetic-test-only';

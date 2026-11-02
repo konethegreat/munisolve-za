@@ -6,13 +6,14 @@
 
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = rateLimit;
+const { AppError } = require('../errors/AppError');
 
 // Auth routes: 5 attempts per 15 minutes (register/login)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   skipSuccessfulRequests: true,
-  message: { success: false, message: 'Too many attempts. Please try again later.' },
+  handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', 'Too many attempts. Please try again later.')),
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -22,7 +23,7 @@ const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
   keyGenerator: (req) => req.user?.id != null ? `user:${req.user.id}` : ipKeyGenerator(req.ip),
-  message: { success: false, message: 'Too many password reset requests.' },
+  handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', 'Too many password reset requests.')),
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -31,7 +32,7 @@ const passwordResetLimiter = rateLimit({
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { success: false, message: 'Too many requests from this IP.' },
+  handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', 'Too many requests from this IP.')),
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -42,7 +43,7 @@ const aiChatLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 30,
   keyGenerator: (req) => req.user?.id != null ? `user:${req.user.id}` : ipKeyGenerator(req.ip),
-  message: { success: false, message: 'You have reached your AI chat limit. Please try again in an hour.' },
+  handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', 'You have reached your AI chat limit. Please try again in an hour.')),
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -51,7 +52,7 @@ const aiChatLimiter = rateLimit({
 const emailVerifLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
-  message: { success: false, message: 'Too many verification requests. Please wait an hour and try again.' },
+  handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', 'Too many verification requests. Please wait an hour and try again.')),
   standardHeaders: true,
   legacyHeaders: false,
 });
