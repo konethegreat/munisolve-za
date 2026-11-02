@@ -55,6 +55,18 @@ export async function transitionReport(options: TransitionOptions) {
     const report = await tx.report.findUnique({ where: { id: options.reportId } });
     if (!report) throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found.');
 
+    // The citizen route ("reports", source of PATCH /api/reports/:id/status) is auth-only, so it must
+    // not disclose whether a foreign report exists. Check ownership before any other guard (including
+    // the ASSIGNED guard) so ownership failures stay indistinguishable from a missing report.
+    // The supervisor and admin routes keep their global scope.
+    if (
+      options.source === 'reports' &&
+      !['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(options.actor.role) &&
+      report.userId !== options.actor.id
+    ) {
+      throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found.');
+    }
+
     if (options.nextStatus === 'ASSIGNED') {
       throw new AppError(400, 'ASSIGNMENT_REQUIRED', 'Use the assignment endpoint to assign a team.');
     }

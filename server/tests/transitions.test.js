@@ -113,4 +113,35 @@ describe('report transitions', () => {
     assert.deepEqual(history(report.id).map((row) => [row.fromStatus, row.toStatus]), [['PENDING', 'ASSIGNED']]);
     assert.deepEqual(actions(report.id), ['REPORT_ASSIGNED']);
   });
+
+  test('another citizen asking for ASSIGNED gets the same 404 as a missing report', async () => {
+    const otherCitizen = h.makeUser({ email: 'other-citizen@example.com' });
+    const report = h.makeReport(citizen, { status: 'PENDING' });
+
+    const res = await h.api('PATCH', `/api/reports/${report.id}/status`, {
+      token: as(otherCitizen),
+      body: { status: 'ASSIGNED' },
+    });
+
+    assert.equal(res.status, 404);
+    assert.equal(res.body.errorCode, 'REPORT_NOT_FOUND');
+    assert.equal(h.db.tables.report.find((row) => row.id === report.id).status, 'PENDING');
+    assert.equal(history(report.id).length, 0);
+    assert.equal(actions(report.id).length, 0);
+  });
+
+  test('a supervisor cannot transition a foreign report through the citizen route', async () => {
+    const report = h.makeReport(citizen, { status: 'PENDING' });
+
+    const res = await h.api('PATCH', `/api/reports/${report.id}/status`, {
+      token: as(supervisor),
+      body: { status: 'IN_PROGRESS' },
+    });
+
+    assert.equal(res.status, 404);
+    assert.equal(res.body.errorCode, 'REPORT_NOT_FOUND');
+    assert.equal(h.db.tables.report.find((row) => row.id === report.id).status, 'PENDING');
+    assert.equal(history(report.id).length, 0);
+    assert.equal(actions(report.id).length, 0);
+  });
 });
