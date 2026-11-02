@@ -2,6 +2,7 @@ import prisma from '../config/db.config';
 import { AppError } from '../errors/AppError';
 import { ALLOWED_TRANSITIONS, canTransition } from '../domain/reportStateMachine';
 import type { ReportStatus, Role } from '../domain/reportStateMachine';
+import { resetResolutionWindow } from './sla.service';
 
 export type TransitionSource = 'reports' | 'supervisor' | 'admin';
 
@@ -126,7 +127,10 @@ export async function transitionReport(options: TransitionOptions) {
       (options.nextStatus === 'PENDING' || options.nextStatus === 'IN_PROGRESS') &&
       REOPEN_SOURCES.includes(report.status)
     ) {
+      const windows = await resetResolutionWindow(report.category, new Date(), tx);
       data.reopenCount = { increment: 1 };
+      data.resolutionDueAt = windows.resolutionDueAt;
+      data.slaCycleStartedAt = windows.slaCycleStartedAt;
     }
 
     const guard = await tx.report.updateMany({

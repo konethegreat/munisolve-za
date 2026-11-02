@@ -6,6 +6,7 @@ const { AppError } = require('../errors/AppError');
 const { generateAutoResponse } = require('./ai.controller');
 const { getWeatherForLocation } = require('../services/weather.service');
 const { transitionReport } = require('../services/report.service');
+const { slaWindowsForNewReport } = require('../services/sla.service');
 
 const createReport = async (req, res) => {
   const { title, description, category, municipality, address, latitude, longitude } = req.validated.body;
@@ -20,6 +21,8 @@ const createReport = async (req, res) => {
       weatherData = null;
     }
   }
+
+  const slaWindows = await slaWindowsForNewReport(category);
 
   const report = await prisma.report.create({
     data: {
@@ -39,6 +42,7 @@ const createReport = async (req, res) => {
       }),
       status: 'PENDING',
       userId,
+      ...slaWindows,
     },
     include: {
       user: { select: { id: true, firstName: true, lastName: true, email: true } },
