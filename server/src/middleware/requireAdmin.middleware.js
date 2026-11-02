@@ -5,33 +5,19 @@
 // Must be used to protect admin-only routes
 
 const { authenticate } = require('./auth.middleware');
+const { AppError } = require('../errors/AppError');
 
 const requireAdmin = async (req, res, next) => {
   return authenticate(req, res, () => {
-    try {
-      const role = req.user?.role;
-      const isAdmin = role === 'MUNICIPAL_ADMIN' || role === 'SUPER_ADMIN';
+    const role = req.user?.role;
+    const isAdmin = role === 'MUNICIPAL_ADMIN' || role === 'SUPER_ADMIN';
 
-      if (!isAdmin) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied. Admin privileges required.',
-          errorCode: 'ADMIN_ONLY',
-        });
-      }
-
-      return next();
-    } catch (error) {
-      console.error('[REQUIRE_ADMIN ERROR]', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Authorization error. Please try again.',
-        errorCode: 'AUTHZ_ERROR',
-        ...(process.env.NODE_ENV === 'development' && { debug: error.message }),
-      });
+    if (!isAdmin) {
+      throw new AppError(403, 'ADMIN_ONLY', 'Access denied. Admin privileges required.');
     }
+
+    return next();
   });
 };
 
 module.exports = { requireAdmin };
-

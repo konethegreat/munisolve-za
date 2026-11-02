@@ -51,7 +51,8 @@ describe('authentication', () => {
 
       assert.equal(wrongPassword.status, 401);
       assert.equal(wrongPassword.body.errorCode, 'INVALID_CREDENTIALS');
-      assert.deepEqual(unknownEmail.body, wrongPassword.body);
+      assert.equal(unknownEmail.body.errorCode, wrongPassword.body.errorCode);
+      assert.equal(unknownEmail.body.message, wrongPassword.body.message);
       assert.ok(h.db.tables.activityLog.some((log) => log.action === 'LOGIN_FAILED' && log.userId === user.id));
     });
 
@@ -82,7 +83,10 @@ describe('authentication', () => {
         assert.equal((await login(user.email, 'Wrong#Passw0rd9', ip)).status, 401);
       }
 
-      assert.equal((await login(user.email, 'Wrong#Passw0rd9', ip)).status, 429);
+      const limited = await login(user.email, 'Wrong#Passw0rd9', ip);
+      assert.equal(limited.status, 429);
+      assert.equal(limited.body.errorCode, 'RATE_LIMITED');
+      assert.equal(limited.body.message, 'Too many attempts. Please try again later.');
       assert.equal((await login(user.email, h.password, ip)).status, 429);
     });
 

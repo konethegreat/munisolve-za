@@ -38,6 +38,7 @@ describe('reports', () => {
       const res = await h.api('POST', '/api/reports', {
         token: as(alice),
         body: { ...body, userId: bob.id, status: 'RESOLVED', assignedTeamId: 1, afterPhotoUrl: 'https://example.com/x.jpg' },
+        headers: { 'x-request-id': 'test-request-1234' },
       });
 
       assert.equal(res.status, 201);
@@ -48,6 +49,8 @@ describe('reports', () => {
       assert.ok(!('password' in res.body.data.user));
       assert.equal(reportRow(res.body.data.id).userId, alice.id);
       assert.equal(logsFor('CREATE_REPORT').length, 1);
+      // The audit row is correlated with the request that created the report.
+      assert.equal(logsFor('CREATE_REPORT')[0].requestId, 'test-request-1234');
     });
 
     test('adds the assistant acknowledgement, and a fallback message when the AI is down', async () => {
@@ -153,7 +156,8 @@ describe('reports', () => {
       const missing = await h.api('GET', '/api/reports/99999', { token: as(bob) });
 
       assert.equal(other.status, 404);
-      assert.deepEqual(other.body, missing.body);
+      assert.equal(other.body.errorCode, missing.body.errorCode);
+      assert.equal(other.body.message, missing.body.message);
     });
   });
 
@@ -163,13 +167,13 @@ describe('reports', () => {
 
       const res = await h.api('PUT', `/api/reports/${report.id}`, {
         token: as(alice),
-        body: { title: 'Updated title', description: 'Updated description', status: 'RESOLVED', userId: bob.id },
+        body: { title: 'Updated title', description: 'Updated description for the report', status: 'RESOLVED', userId: bob.id },
       });
 
       assert.equal(res.status, 200);
       assert.equal(res.body.data.title, 'Updated title');
       const stored = reportRow(report.id);
-      assert.equal(stored.description, 'Updated description');
+      assert.equal(stored.description, 'Updated description for the report');
       assert.equal(stored.status, 'PENDING');
       assert.equal(stored.userId, alice.id);
     });
@@ -178,7 +182,7 @@ describe('reports', () => {
       const report = h.makeReport(alice);
       const untouched = h.db.snapshot();
 
-      const edit = await h.api('PUT', `/api/reports/${report.id}`, { token: as(bob), body: { title: 'Defaced' } });
+      const edit = await h.api('PUT', `/api/reports/${report.id}`, { token: as(bob), body: { title: 'Defaced by another citizen' } });
       const remove = await h.api('DELETE', `/api/reports/${report.id}`, { token: as(bob) });
 
       assert.equal(edit.status, 404);
@@ -221,11 +225,20 @@ describe('reports', () => {
     test('a citizen cannot set any status except RESOLVED', async () => {
       const report = h.makeReport(alice, { status: 'PENDING' });
 
-      for (const status of ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'REJECTED', 'CLOSED']) {
+      for (const status of ['PENDING', 'IN_PROGRESS', 'REJECTED', 'CLOSED']) {
         const res = await h.api('PATCH', `/api/reports/${report.id}/status`, { token: as(alice), body: { status } });
         assert.equal(res.status, 403, status);
         assert.equal(res.body.errorCode, 'INSUFFICIENT_PERMISSIONS', status);
       }
+
+      // ASSIGNED is refused for every role by the status endpoints: assignment has its own route.
+      const assigned = await h.api('PATCH', `/api/reports/${report.id}/status`, {
+        token: as(alice),
+        body: { status: 'ASSIGNED' },
+      });
+      assert.equal(assigned.status, 400);
+      assert.equal(assigned.body.errorCode, 'ASSIGNMENT_REQUIRED');
+
       assert.equal(reportRow(report.id).status, 'PENDING');
     });
 
@@ -235,8 +248,8 @@ describe('reports', () => {
 
         const res = await h.api('PATCH', `/api/reports/${report.id}/status`, { token: as(alice), body: { status: 'RESOLVED' } });
 
-        assert.equal(res.status, 400, status);
-        assert.equal(res.body.message, `Cannot change status from ${status} to RESOLVED.`);
+        assert.equal(res.status, 409, status);
+        assert.equal(res.body.errorCode, 'INVALID_TRANSITION', status);
         assert.equal(reportRow(report.id).status, status);
       }
     });
@@ -256,10 +269,12 @@ describe('reports', () => {
       const res = await h.api('PATCH', `/api/reports/${report.id}/status`, { token: as(admin), body: { status: 'DONE' } });
 
       assert.equal(res.status, 400);
-      assert.match(res.body.message, /Must be one of: PENDING, ASSIGNED, IN_PROGRESS, RESOLVED, REJECTED, CLOSED/);
+      assert.equal(res.body.errorCode, 'VALIDATION_ERROR');
+      assert.ok(res.body.errors.some((error) => error.field === 'status'));
+      assert.equal(reportRow(report.id).status, 'PENDING');
     });
 
-    test('an admin can set any status, from either admin endpoint, and the owner sees it', async () => {
+    test('an admin can move a report to IN_PROGRESS and then REJECTED, from either admin endpoint, and the owner sees it', async () => {
       const report = h.makeReport(alice);
 
       const viaReports = await h.api('PATCH', `/api/reports/${report.id}/status`, {

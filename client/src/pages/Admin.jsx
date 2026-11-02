@@ -4,6 +4,7 @@ import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import WeatherBadge from '../components/WeatherBadge';
+import { useAuth } from '../hooks/useAuth';
 
 const REPORT_STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending' },
@@ -13,6 +14,33 @@ const REPORT_STATUS_OPTIONS = [
   { value: 'REJECTED', label: 'Rejected' },
   { value: 'CLOSED', label: 'Closed' },
 ];
+
+// Mirrors ALLOWED_TRANSITIONS in server/src/domain/reportStateMachine.ts. The status endpoint
+// only accepts these moves (an admin gets any other move only as a force override), and
+// ASSIGNED is reached through the assignment route, never through a status change.
+const CANONICAL_TRANSITIONS = {
+  PENDING: ['ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'],
+  ASSIGNED: ['ASSIGNED', 'IN_PROGRESS', 'REJECTED'],
+  IN_PROGRESS: ['RESOLVED', 'REJECTED'],
+  RESOLVED: ['CLOSED', 'IN_PROGRESS'],
+  CLOSED: ['IN_PROGRESS'],
+  REJECTED: ['PENDING'],
+};
+
+// The options a row's status dropdown may offer: the current status plus the canonical targets
+// this page can actually send, and every non-ASSIGNED status for a SUPER_ADMIN force override.
+function reportStatusOptions(currentStatus, role) {
+  const allowed = new Set(currentStatus ? [currentStatus] : []);
+  for (const status of CANONICAL_TRANSITIONS[currentStatus] || []) {
+    if (status !== 'ASSIGNED') allowed.add(status);
+  }
+  if (role === 'SUPER_ADMIN') {
+    for (const option of REPORT_STATUS_OPTIONS) {
+      if (option.value !== 'ASSIGNED') allowed.add(option.value);
+    }
+  }
+  return REPORT_STATUS_OPTIONS.filter((option) => allowed.has(option.value));
+}
 
 function formatDate(value) {
   if (!value) return '—';
@@ -52,6 +80,7 @@ function normalize(str) {
 }
 
 export default function Admin() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('REPORTS'); // REPORTS | USERS
 
   const [reports, setReports] = useState([]);
@@ -152,11 +181,27 @@ export default function Admin() {
     });
   }, [reports, reportSearch, reportStatusFilter, reportWeatherFilter]);
 
-  const handleReportStatusChange = async (reportId, newStatus) => {
-    setReportUpdatingId(reportId);
+  const handleReportStatusChange = async (reportId, currentStatus, newStatus) => {
     setReportsError('');
+    if (newStatus === currentStatus) return;
+
+    const canonical = (CANONICAL_TRANSITIONS[currentStatus] || []).includes(newStatus);
+    let reason;
+    if (user?.role === 'SUPER_ADMIN' && !canonical) {
+      const input = window.prompt(
+        'This is not a standard transition. Enter a reason of at least 10 characters to force it:'
+      );
+      if (input === null || input.trim().length < 10) {
+        setReportsError('A reason of at least 10 characters is required for a force override.');
+        return;
+      }
+      reason = input.trim();
+    }
+
+    setReportUpdatingId(reportId);
     try {
-      const { data } = await api.patch(`/admin/reports/${reportId}/status`, { status: newStatus });
+      const payload = reason ? { status: newStatus, reason } : { status: newStatus };
+      const { data } = await api.patch(`/admin/reports/${reportId}/status`, payload);
       if (data?.success && data?.data) {
         setReports((prev) => prev.map((r) => (r.id === reportId ? data.data : r)));
       } else {
@@ -398,10 +443,10 @@ export default function Admin() {
                                   <select
                                     value={r.status}
                                     disabled={reportUpdatingId === r.id}
-                                    onChange={(e) => handleReportStatusChange(r.id, e.target.value)}
+                                    onChange={(e) => handleReportStatusChange(r.id, r.status, e.target.value)}
                                     className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white outline-none focus:border-[#0d3b5c] disabled:opacity-60"
                                   >
-                                    {REPORT_STATUS_OPTIONS.map((opt) => (
+                                    {reportStatusOptions(r.status, user?.role).map((opt) => (
                                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                                     ))}
                                   </select>

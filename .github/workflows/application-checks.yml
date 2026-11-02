@@ -16,6 +16,26 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject edits to applied migrations
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          statuses="$(git diff --name-status "$BASE_SHA" HEAD -- server/prisma/migrations)"
+          echo "$statuses"
+          # 20260101000000_init predates versioned migrations: the project used db push,
+          # so it was never applied through migrate deploy. Phase 1 replaces it with a
+          # baseline that matches the real schema. This is the one permitted replacement.
+          legacy="server/prisma/migrations/20260101000000_init"
+          edited="$(printf '%s\n' "$statuses" | awk -F'\t' -v legacy="$legacy" 'NF >= 2 && $1 != "A" && $2 != "" && index($2, legacy "/") != 1 { print $2 }')"
+          if [ -n "$edited" ]; then
+            echo "Migrations already on the base branch must not be edited, renamed or deleted:"
+            echo "$edited"
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -23,6 +43,8 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npm audit --audit-level=low
+      - run: npm run typecheck
+      - run: npm run build
       - run: npm test
 
   postgres-workflow:

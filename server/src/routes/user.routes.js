@@ -10,7 +10,7 @@ const router = express.Router();
 
 const { authenticate } = require('../middleware/auth.middleware');
 const { superAdminOnly } = require('../middleware/authz.middleware');
-const { generalLimiter } = require('../middleware/rateLimit.middleware'); // imported, not defined here
+const { generalLimiter } = require('../middleware/rateLimit.middleware');
 
 // ==========================================
 // PLACEHOLDER ROUTES
@@ -22,9 +22,10 @@ const { generalLimiter } = require('../middleware/rateLimit.middleware'); // imp
  * @desc    Get all users
  * @access  Private (Super Admin only)
  */
+// Not mounted in server.js yet; when it is, the global /api limiter also applies.
 router.get(
   '/',
-  generalLimiter,   // shared limiter
+  generalLimiter,
   authenticate,
   superAdminOnly,
   (req, res) => {

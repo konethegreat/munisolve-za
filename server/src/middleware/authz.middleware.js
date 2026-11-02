@@ -7,6 +7,8 @@
 // Author: MuniSolve ZA Security Team
 // Last Updated: February 2026
 
+const { AppError } = require('../errors/AppError');
+
 /**
  * ==========================================
  * UNDERSTANDING AUTHENTICATION vs AUTHORIZATION
@@ -79,100 +81,47 @@ const authorize = (allowedRoles = []) => {
   // Return the actual middleware function
   // This function will be called when the route is accessed
   return (req, res, next) => {
-    try {
-      // STEP 1: Verify that user is authenticated
-      // The authenticate middleware should run before this
-      // It attaches the user object to req.user
-      if (!req.user) {
-        // User object doesn't exist = authenticate middleware didn't run
-        // OR user is not authenticated
-        return res.status(401).json({
-          success: false,
-          message: 'Authentication required. Please log in.',
-          errorCode: 'NOT_AUTHENTICATED',
-          // Helpful hint for developers
-          hint: 'Ensure authenticate middleware runs before authorize'
-        });
-      }
-      
-      // STEP 2: Verify that user has a role
-      // Defensive programming: ensure role field exists
-      if (!req.user.role) {
-        // User exists but has no role (database integrity issue)
-        console.error(`[AUTHZ ERROR] User ${req.user.id} has no role assigned`);
-        return res.status(403).json({
-          success: false,
-          message: 'User role not assigned. Contact system administrator.',
-          errorCode: 'NO_ROLE_ASSIGNED'
-        });
-      }
-      
-      // STEP 3: Check if allowedRoles array is valid
-      // Ensure developers passed a valid array
-      if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) {
-        // Developer error: authorize() called without specifying roles
-        console.error('[AUTHZ ERROR] No allowed roles specified for this route');
-        return res.status(500).json({
-          success: false,
-          message: 'Authorization configuration error.',
-          errorCode: 'INVALID_AUTH_CONFIG',
-          // Only show in development
-          ...(process.env.NODE_ENV === 'development' && {
-            debug: 'allowedRoles must be a non-empty array'
-          })
-        });
-      }
-      
-      // STEP 4: Check if user's role is in the allowed roles
-      // Case-insensitive comparison for flexibility
-      const userRole = req.user.role.toUpperCase();
-      const isAuthorized = allowedRoles
-        .map(role => role.toUpperCase()) // Convert all to uppercase
-        .includes(userRole); // Check if user's role is in the list
-      
-      // STEP 5: Grant or deny access
-      if (!isAuthorized) {
-        // User is authenticated but doesn't have permission
-        // This is a 403 Forbidden (not 401 Unauthorized)
-        console.warn(
-          `[AUTHZ] Access denied: User ${req.user.email} (${req.user.role}) ` +
-          `attempted to access route requiring: ${allowedRoles.join(', ')}`
-        );
-        
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied. Insufficient permissions.',
-          errorCode: 'INSUFFICIENT_PERMISSIONS',
-          required: allowedRoles,
-          current: req.user.role,
-          // Helpful message based on role
-          hint: getRoleHint(req.user.role, allowedRoles)
-        });
-      }
-      
-      // STEP 6: Authorization successful!
-      // User has the required role, allow request to proceed
-      console.log(
-        `[AUTHZ] Access granted: ${req.user.email} (${req.user.role}) ` +
-        `to ${req.method} ${req.path}`
-      );
-      
-      // Continue to next middleware or route handler
-      next();
-      
-    } catch (error) {
-      // Catch unexpected errors during authorization
-      console.error('[AUTHZ ERROR]', error);
-      
-      return res.status(500).json({
-        success: false,
-        message: 'Authorization error. Please try again.',
-        errorCode: 'AUTHZ_ERROR',
-        ...(process.env.NODE_ENV === 'development' && {
-          debug: error.message
-        })
-      });
+    // STEP 1: Verify that user is authenticated
+    // The authenticate middleware should run before this
+    // It attaches the user object to req.user
+    if (!req.user) {
+      // User object doesn't exist = authenticate middleware didn't run
+      // OR user is not authenticated
+      throw new AppError(401, 'NOT_AUTHENTICATED', 'Authentication required. Please log in.');
     }
+
+    // STEP 2: Verify that user has a role
+    // Defensive programming: ensure role field exists
+    if (!req.user.role) {
+      // User exists but has no role (database integrity issue)
+      throw new AppError(403, 'NO_ROLE_ASSIGNED', 'User role not assigned. Contact system administrator.');
+    }
+
+    // STEP 3: Check if allowedRoles array is valid
+    // Ensure developers passed a valid array
+    if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) {
+      // Developer error: authorize() called without specifying roles
+      throw new AppError(500, 'INVALID_AUTH_CONFIG', 'Authorization configuration error.');
+    }
+
+    // STEP 4: Check if user's role is in the allowed roles
+    // Case-insensitive comparison for flexibility
+    const userRole = req.user.role.toUpperCase();
+    const isAuthorized = allowedRoles
+      .map(role => role.toUpperCase()) // Convert all to uppercase
+      .includes(userRole); // Check if user's role is in the list
+
+    // STEP 5: Grant or deny access
+    if (!isAuthorized) {
+      // User is authenticated but doesn't have permission
+      // This is a 403 Forbidden (not 401 Unauthorized)
+      throw new AppError(403, 'INSUFFICIENT_PERMISSIONS', 'Access denied. Insufficient permissions.');
+    }
+
+    // STEP 6: Authorization successful!
+    // User has the required role, allow request to proceed
+    // Continue to next middleware or route handler
+    next();
   };
 };
 
@@ -226,67 +175,44 @@ const getRoleHint = (userRole, requiredRoles) => {
  */
 const authorizeResource = (resourceType) => {
   return async (req, res, next) => {
-    try {
-      // Ensure user is authenticated
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Authentication required.',
-          errorCode: 'NOT_AUTHENTICATED'
-        });
-      }
-      
-      // Get resource ID from request parameters
-      // Assuming route is like: /reports/:id
-      const resourceId = req.params.id;
-      
-      if (!resourceId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Resource ID not provided.',
-          errorCode: 'MISSING_RESOURCE_ID'
-        });
-      }
-      
-      // SUPER_ADMIN has access to everything
-      if (req.user.role === 'SUPER_ADMIN') {
-        console.log(`[RESOURCE_AUTHZ] SUPER_ADMIN granted access to ${resourceType} ${resourceId}`);
-        return next();
-      }
-      
-      // Resource-specific authorization logic
-      // This is a simplified version - expand based on your needs
-      if (resourceType === 'Report') {
-        // For reports, we need to check:
-        // 1. CITIZEN: Can only access their own reports
-        // 2. MUNICIPAL_ADMIN: Can access reports in their municipality
-        
-        // This would typically involve a database query
-        // For now, we'll attach the resource check to the route handler
-        // The route handler should implement the actual permission check
-        
-        // Store resource info for route handler to use
-        req.resourceType = resourceType;
-        req.resourceId = resourceId;
-        
-        return next();
-      }
-      
-      // If resource type not recognized
-      return res.status(500).json({
-        success: false,
-        message: 'Unknown resource type.',
-        errorCode: 'UNKNOWN_RESOURCE_TYPE'
-      });
-      
-    } catch (error) {
-      console.error('[RESOURCE_AUTHZ ERROR]', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Resource authorization error.',
-        errorCode: 'RESOURCE_AUTHZ_ERROR'
-      });
+    // Ensure user is authenticated
+    if (!req.user) {
+      throw new AppError(401, 'NOT_AUTHENTICATED', 'Authentication required.');
     }
+
+    // Get resource ID from request parameters
+    // Assuming route is like: /reports/:id
+    const resourceId = req.params.id;
+
+    if (!resourceId) {
+      throw new AppError(400, 'MISSING_RESOURCE_ID', 'Resource ID not provided.');
+    }
+
+    // SUPER_ADMIN has access to everything
+    if (req.user.role === 'SUPER_ADMIN') {
+      return next();
+    }
+
+    // Resource-specific authorization logic
+    // This is a simplified version - expand based on your needs
+    if (resourceType === 'Report') {
+      // For reports, we need to check:
+      // 1. CITIZEN: Can only access their own reports
+      // 2. MUNICIPAL_ADMIN: Can access reports in their municipality
+
+      // This would typically involve a database query
+      // For now, we'll attach the resource check to the route handler
+      // The route handler should implement the actual permission check
+
+      // Store resource info for route handler to use
+      req.resourceType = resourceType;
+      req.resourceId = resourceId;
+
+      return next();
+    }
+
+    // If resource type not recognized
+    throw new AppError(500, 'UNKNOWN_RESOURCE_TYPE', 'Unknown resource type.');
   };
 };
 
@@ -304,54 +230,36 @@ const authorizeResource = (resourceType) => {
  */
 const authorizeMunicipality = (getMunicipalityId) => {
   return async (req, res, next) => {
-    try {
-      // SUPER_ADMIN bypasses municipality restrictions
-      if (req.user.role === 'SUPER_ADMIN') {
-        return next();
-      }
-      
-      // CITIZENS don't have municipality restrictions (they report to any)
-      if (req.user.role === 'CITIZEN') {
-        return next();
-      }
-      
-      // For MUNICIPAL_ADMIN, check municipality access
-      if (req.user.role === 'MUNICIPAL_ADMIN') {
-        // Get the municipality ID from the request
-        // This function is provided when creating the middleware
-        const requestedMunicipalityId = getMunicipalityId(req);
-        
-        // In a real implementation, we'd check user's assigned municipality
-        // For now, this is a placeholder
-        // You would fetch this from user.municipality in the database
-        
-        // Example check:
-        // if (req.user.municipalityId !== requestedMunicipalityId) {
-        //   return res.status(403).json({
-        //     success: false,
-        //     message: 'Access denied. You can only manage your own municipality.',
-        //     errorCode: 'WRONG_MUNICIPALITY'
-        //   });
-        // }
-        
-        return next();
-      }
-      
-      // Unknown role
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied.',
-        errorCode: 'AUTHZ_FAILED'
-      });
-      
-    } catch (error) {
-      console.error('[MUNICIPALITY_AUTHZ ERROR]', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Municipality authorization error.',
-        errorCode: 'MUNICIPALITY_AUTHZ_ERROR'
-      });
+    // SUPER_ADMIN bypasses municipality restrictions
+    if (req.user.role === 'SUPER_ADMIN') {
+      return next();
     }
+
+    // CITIZENS don't have municipality restrictions (they report to any)
+    if (req.user.role === 'CITIZEN') {
+      return next();
+    }
+
+    // For MUNICIPAL_ADMIN, check municipality access
+    if (req.user.role === 'MUNICIPAL_ADMIN') {
+      // Get the municipality ID from the request
+      // This function is provided when creating the middleware
+      const requestedMunicipalityId = getMunicipalityId(req);
+
+      // In a real implementation, we'd check user's assigned municipality
+      // For now, this is a placeholder
+      // You would fetch this from user.municipality in the database
+
+      // Example check:
+      // if (req.user.municipalityId !== requestedMunicipalityId) {
+      //   throw new AppError(403, 'WRONG_MUNICIPALITY', 'Access denied. You can only manage your own municipality.');
+      // }
+
+      return next();
+    }
+
+    // Unknown role
+    throw new AppError(403, 'AUTHZ_FAILED', 'Access denied.');
   };
 };
 

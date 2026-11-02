@@ -18,6 +18,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createFakePrisma } = require('./fakePrisma');
 
+// Pin the environment at load time: a test file may import an application module (such as the
+// error middleware) before startApp() runs, and src/logger.ts chooses its level when it is
+// first imported. Setting this here keeps every test run's logger silent.
+process.env.NODE_ENV = 'test';
+
 const SERVER_ROOT = path.resolve(__dirname, '..', '..');
 
 // Generate credentials for this test process; no reusable credential belongs in source.
@@ -51,7 +56,6 @@ let ipCounter = 0;
 async function startApp() {
   quietConsole();
 
-  process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = TEST_JWT_SECRET;
   // Only the stub sees this synthetic value; the real SDK is replaced below.
   process.env.ANTHROPIC_API_KEY = 'synthetic-test-only';
@@ -103,7 +107,9 @@ async function startApp() {
   });
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
-  async function api(method, route, { token, body, ip, headers } = {}) {
+  // `body` is JSON-encoded for convenience. `rawBody` is sent verbatim, so a test can
+  // submit a deliberately malformed payload (for example `'{'`) unchanged.
+  async function api(method, route, { token, body, rawBody, ip, headers } = {}) {
     ipCounter += 1;
     const response = await fetch(baseUrl + route, {
       method,
@@ -113,7 +119,7 @@ async function startApp() {
         ...(token && { authorization: `Bearer ${token}` }),
         ...headers,
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: rawBody !== undefined ? rawBody : body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await response.text();
     let json = null;

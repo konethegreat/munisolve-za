@@ -6,6 +6,8 @@
 // so report creation always succeeds.
 // ==========================================
 
+const { logger } = require('../logger');
+
 const weatherCache = {};
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
@@ -43,7 +45,7 @@ const getWeatherForLocation = async (latitude, longitude) => {
     weatherCache[cacheKey] = { data: result, timestamp: now };
     return result;
   } catch (error) {
-    console.error('[WEATHER] Error:', error.message);
+    logger.warn({ err: error }, 'Weather lookup failed');
     return null; // Weather is non-critical
   }
 };

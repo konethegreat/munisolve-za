@@ -9,6 +9,7 @@
 // Import required packages
 const helmet = require('helmet'); // Security headers
 const cors = require('cors');     // Cross-Origin Resource Sharing
+const { logger } = require('../logger');
 
 /**
  * ==========================================
@@ -199,7 +200,7 @@ const configureCORS = () => {
         callback(null, true);
       } else {
         // Origin is NOT allowed
-        console.warn(`[CORS] Blocked request from unauthorized origin: ${origin}`);
+        logger.warn({ origin }, 'Blocked request from unauthorized origin');
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -321,13 +322,15 @@ const securityLogger = (req, res, next) => {
   );
   
   if (isSuspicious) {
-    console.warn('[SECURITY] Suspicious request detected:', {
-      method: req.method,
-      url: req.url,
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-      timestamp: new Date().toISOString()
-    });
+    logger.warn(
+      {
+        method: req.method,
+        url: req.url,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      },
+      'Suspicious request detected'
+    );
     
     // Optionally block the request
     // return res.status(400).json({
@@ -447,7 +450,7 @@ Before deploying to production:
 ✅ 9. Input Validation
    - Validate ALL user input
    - Sanitize HTML/scripts
-   - Use express-validator
+   - Validate with the Zod schemas in server/src/schemas
 
 ✅ 10. Authentication
    - Use bcrypt for passwords

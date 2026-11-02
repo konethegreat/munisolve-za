@@ -83,15 +83,22 @@ async function main() {
   const dbPort = Number(mapping.split(':').at(-1));
   if (!Number.isInteger(dbPort) || dbPort < 1) throw new Error('Could not determine the local database port.');
   env.DATABASE_URL = `postgresql://postgres:${env.POSTGRES_PASSWORD}@127.0.0.1:${dbPort}/munisolve_demo`;
+  env.DIRECT_URL = env.DATABASE_URL;
   await waitFor(async () => {
     try { await run('docker', ['exec', name, 'pg_isready', '-U', 'postgres'], { stdio: 'ignore' }); return true; }
     catch { return false; }
   }, 'PostgreSQL');
-  await run(process.execPath, [require.resolve('prisma/build/index.js'), 'db', 'push'], { stdio: 'inherit' });
-  await run(process.execPath, ['prisma/seedDemo.js'], { stdio: 'inherit' });
+  await run(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], { stdio: 'inherit' });
+  await run(process.execPath, [
+    require.resolve('prisma/build/index.js'), 'migrate', 'diff',
+    '--from-url', env.DATABASE_URL,
+    '--to-schema-datamodel', 'prisma/schema.prisma',
+    '--exit-code',
+  ], { stdio: 'inherit' });
+  await run(process.execPath, ['--import', 'tsx', 'prisma/seedDemo.js'], { stdio: 'inherit' });
   env.PORT = String(await availablePort());
   env.CLIENT_URL = `http://127.0.0.1:${await availablePort()}`;
-  const api = launch(process.execPath, ['scripts/start-demo-server.js'], { stdio: 'inherit' });
+  const api = launch(process.execPath, ['--import', 'tsx', 'scripts/start-demo-server.js'], { stdio: 'inherit' });
   api.once('error', () => { if (!finishing) cleanup().then(() => process.exit(1)); });
   api.once('exit', () => { if (!finishing) cleanup().then(() => process.exit(1)); });
   await waitFor(async () => {

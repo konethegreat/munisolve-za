@@ -9,6 +9,8 @@
 // afterwards, so retrying briefly rides through the drop transparently instead
 // of surfacing it to the user as a 500.
 
+const { logger } = require('../logger');
+
 // Prisma error codes that signal a transient connectivity issue (safe to retry)
 const RETRYABLE_CODES = new Set([
   'P1001', // Can't reach database server
@@ -46,10 +48,7 @@ async function withRetry(operation, options = {}) {
       if (!isRetryableError(error) || attempt >= retries) throw error;
       const delay = baseDelayMs * 2 ** attempt;
       attempt += 1;
-      console.warn(
-        `[DATABASE] Transient connection error (${error.code || error.errorCode || 'driver'}). ` +
-          `Retry ${attempt}/${retries} in ${delay}ms.`
-      );
+      logger.warn({ attempt, retries, delay }, 'Retrying a transient database connection error');
       await sleep(delay);
     }
   }
