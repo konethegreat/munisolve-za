@@ -38,6 +38,9 @@ const DEMO_TEAMS = [
     municipality: 'City of Johannesburg',
     latitude: -26.2041,
     longitude: 28.0473,
+    capacity: 10,
+    maxRadiusKm: 20,
+    autoAssignEnabled: true,
   },
   {
     name: 'Demo Water Crew',
@@ -45,6 +48,9 @@ const DEMO_TEAMS = [
     municipality: 'City of Tshwane',
     latitude: -25.7479,
     longitude: 28.2293,
+    capacity: 10,
+    maxRadiusKm: 20,
+    autoAssignEnabled: true,
   },
 ];
 

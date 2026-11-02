@@ -39,7 +39,7 @@ async function verifyWorkflow(baseURL, password, tickSecret) {
     title: 'Demo workflow: pothole on Fictional Lane',
     description: 'Synthetic walkthrough only. A fictional pothole for testing the reporting workflow.',
     category: 'POTHOLE', municipality: 'City of Johannesburg', address: 'Fictional Lane (synthetic)',
-    latitude: -26.2051, longitude: 28.0483,
+    latitude: -26.21, longitude: 28.05,
   });
   const report = created.data;
   assert.equal(report.status, 'PENDING');
@@ -98,9 +98,42 @@ async function verifyWorkflow(baseURL, password, tickSecret) {
   });
   assert.equal(tick.data.enqueued, 0);
   assert.equal(tick.data.sent, 0);
+  assert.equal(tick.data.autoAssigned, 0);
+  assert.equal(tick.data.decisions, 0);
+
+  const canonical = await request('Citizen A files a fictional report for duplicate checks', 'POST', '/reports', 201, tokens.citizenA, {
+    title: 'Demo duplicates: broken paving on Synthetic Street',
+    description: 'Synthetic walkthrough only. Broken paving used for the duplicate workflow.',
+    category: 'POTHOLE', municipality: 'City of Johannesburg', address: 'Synthetic Street (made-up)',
+    latitude: -26.2101, longitude: 28.0501,
+  });
+  const repeat = await request('Citizen B files the same fictional problem nearby', 'POST', '/reports', 201, tokens.citizenB, {
+    title: 'Demo duplicates: broken paving on Synthetic Street',
+    description: 'Synthetic walkthrough only. The same broken paving reported by a second citizen.',
+    category: 'POTHOLE', municipality: 'City of Johannesburg', address: 'Synthetic Street (made-up)',
+    latitude: -26.2102, longitude: 28.0502,
+  });
+  const duplicateSuggestions = await request('Duplicate suggestions are returned on creation', 'GET',
+    `/reports/${repeat.data.id}/duplicates`, 200, tokens.citizenB);
+  assert.ok(duplicateSuggestions.data.some((entry) => entry.candidate.id === canonical.data.id),
+    'The nearby report is suggested as a duplicate.');
+  await request('Citizen B cannot confirm a duplicate against another citizen report', 'POST',
+    `/reports/${canonical.data.id}/duplicates/${repeat.data.id}/confirm`, 404, tokens.citizenB);
+  await request('Citizen B confirms the duplicate', 'POST',
+    `/reports/${repeat.data.id}/duplicates/${canonical.data.id}/confirm`, 200, tokens.citizenB);
+  const merged = await request('The merged report is closed as a duplicate', 'GET', `/reports/${repeat.data.id}`, 200, tokens.citizenB);
+  assert.equal(merged.data.status, 'CLOSED');
+  assert.equal(merged.data.closureReason, 'DUPLICATE');
+  assert.equal(merged.data.duplicateOfId, canonical.data.id);
+  await request('Admin undoes the duplicate merge', 'POST', `/admin/reports/${repeat.data.id}/unmerge`, 200, tokens.admin);
+  const restored = await request('The restored report is pending again', 'GET', `/reports/${repeat.data.id}`, 200, tokens.citizenB);
+  assert.equal(restored.data.status, 'PENDING');
+  assert.equal(restored.data.duplicateOfId, null);
   console.log(JSON.stringify({ result: 'passed', database: 'disposable PostgreSQL 16', steps,
     lifecycle: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'],
+    duplicateLifecycle: ['SUGGESTED', 'MERGED', 'CLOSED', 'UNMERGED', 'PENDING'],
     limitations: ['No real municipal submission', 'No AI, email, Google OAuth or weather provider verification',
+      'Auto-assignment only runs for reports older than five minutes, so the tick has nothing to assign here',
       'Photo is a placeholder URL; no upload or repair verification', 'HTTP workflow; browser walkthrough is separate'],
   }, null, 2));
   return steps;

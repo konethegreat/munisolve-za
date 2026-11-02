@@ -36,6 +36,11 @@ export const reportListQuerySchema = paginationSchema.extend({
   municipality: z.string().trim().min(2).max(120).optional(),
 });
 
+export const duplicateParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  candidateId: z.coerce.number().int().positive(),
+});
+
 export const assignReportSchema = z.object({
   teamId: z.coerce.number().int().positive(),
   note: z.string().trim().max(500).optional(),

@@ -40,7 +40,15 @@ describe('internal tick endpoint', () => {
 
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
-    assert.deepEqual(res.body.data, { enqueued: 0, claimed: 0, sent: 0, failed: 0, skipped: 0 });
+    assert.deepEqual(res.body.data, {
+      enqueued: 0,
+      claimed: 0,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      autoAssigned: 0,
+      decisions: 0,
+    });
     assert.equal(JSON.stringify(res.body).includes(h.tickSecret), false);
   });
 

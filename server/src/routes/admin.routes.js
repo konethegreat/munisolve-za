@@ -26,6 +26,7 @@ const {
   deleteAdminUser,
   getAdminActivityLogs,
 } = require('../controllers/admin.controller');
+const { unmergeReport } = require('../controllers/duplicate.controller');
 
 router.use(requireAdmin);
 
@@ -36,6 +37,7 @@ router.get('/dashboard', getAdminDashboard);
 router.get('/reports', validate({ query: adminReportsQuerySchema }), getAdminReports);
 router.get('/reports/:id', validate({ params: idParamSchema }), getAdminReport);
 router.patch('/reports/:id/status', validate({ params: idParamSchema, body: adminReportStatusSchema }), patchAdminReportStatus);
+router.post('/reports/:id/unmerge', validate({ params: idParamSchema }), unmergeReport);
 router.delete('/reports/:id', validate({ params: idParamSchema }), deleteAdminReport);
 
 // Users

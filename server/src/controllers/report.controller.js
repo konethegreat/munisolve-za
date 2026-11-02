@@ -7,6 +7,7 @@ const { generateAutoResponse } = require('./ai.controller');
 const { getWeatherForLocation } = require('../services/weather.service');
 const { transitionReport } = require('../services/report.service');
 const { slaWindowsForNewReport } = require('../services/sla.service');
+const { suggestDuplicates, autoMergeSameReporter } = require('../services/duplicate.service');
 
 const createReport = async (req, res) => {
   const { title, description, category, municipality, address, latitude, longitude } = req.validated.body;
@@ -62,10 +63,37 @@ const createReport = async (req, res) => {
     },
   });
 
+  // Duplicate detection is advisory: a failure here must never fail the report.
+  let duplicates = [];
+  let mergedInto = null;
+  try {
+    duplicates = await suggestDuplicates({ report });
+    if (duplicates.length > 0) {
+      mergedInto = await autoMergeSameReporter(report, duplicates, {
+        actor: { id: userId, role: req.user.role },
+        requestId: req.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+    }
+  } catch { /* Keep the report even when duplicate detection fails. */ }
+
+  const finalReport = mergedInto
+    ? await prisma.report.findUnique({
+        where: { id: report.id },
+        include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+      })
+    : report;
+
   res.status(201).json({
     success: true,
-    message: 'Report created successfully',
-    data: { ...report, aiResponse },
+    message: mergedInto ? `Report merged into existing report #${mergedInto.id}` : 'Report created successfully',
+    data: {
+      ...finalReport,
+      aiResponse,
+      duplicates,
+      mergedInto: mergedInto ? { id: mergedInto.id, title: mergedInto.title, status: mergedInto.status } : null,
+    },
   });
 };
 

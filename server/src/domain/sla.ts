@@ -2,7 +2,8 @@ export type NotificationKind =
   | 'SLA_RESPONSE_WARNING'
   | 'SLA_RESPONSE_BREACH'
   | 'SLA_RESOLUTION_WARNING'
-  | 'SLA_RESOLUTION_BREACH';
+  | 'SLA_RESOLUTION_BREACH'
+  | 'REPORT_AUTO_ASSIGNED';
 
 export interface SlaPolicyValues {
   responseMinutes: number;

@@ -136,6 +136,14 @@ Repository secrets required by the workflow:
 
 Email delivery uses `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Without them the outbox marks rows `SKIPPED` instead of retrying forever. Policies are seeded in the migration; changing a target is a new migration.
 
+## Duplicate reports and automatic assignment
+
+When a report is created with coordinates, the API compares it with open reports in the same category family: a zero-cost bounding-box query followed by a Haversine distance check and a title-similarity score. Matches above 0.65 are stored as `DuplicateCandidate` rows and returned with the creation response. A near-certain match (0.9 or more) from the same reporter is merged immediately.
+
+`GET /api/reports/:id/duplicates` lists suggestions to the owner or an admin. Confirming a duplicate closes the report as `DUPLICATE`, points it at the canonical report, clears its SLA and team, records a `MergeRecord` and follows it for the reporter. Dismissing keeps both reports. `POST /api/admin/reports/:id/unmerge` restores a merged report to `PENDING` with fresh SLA windows.
+
+The same tick that runs SLA checks can also assign crews. It evaluates `PENDING`, unassigned reports that are at least five minutes old, scores active teams in the same municipality on skill (40), distance (up to 30), municipality (20) and free capacity (up to 10), and assigns only when the winner scores at least 70 with a lead of 15 over the runner-up. Reports with no coordinates, category `OTHER`, or an open duplicate suggestion are skipped. Every evaluation writes one `AssignmentDecision` row with the mode and reasons, assignment history shows `SYSTEM`, and active admins receive one outbox notification. Set `AUTO_ASSIGN_ENABLED=true` on the API to enable it; each team also needs `autoAssignEnabled` (teams are off by default). The flag is off in `render.yaml` and on in `npm run demo`.
+
 Local commands, from `server/`:
 
 ```sh

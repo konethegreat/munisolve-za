@@ -9,6 +9,7 @@ export type TransitionSource = 'reports' | 'supervisor' | 'admin';
 interface Actor {
   id: number;
   role: Role;
+  system?: boolean;
 }
 
 interface TransitionOptions {
@@ -210,7 +211,7 @@ export async function assignReport(options: AssignOptions) {
         fromStatus: report.status,
         toStatus: 'ASSIGNED',
         actorId: options.actor.id,
-        actorRole: options.actor.role,
+        actorRole: options.actor.system ? 'SYSTEM' : options.actor.role,
         note: options.note ?? null,
         requestId: options.requestId ?? null,
       },
@@ -222,7 +223,9 @@ export async function assignReport(options: AssignOptions) {
         action: 'REPORT_ASSIGNED',
         entity: 'Report',
         entityId: report.id,
-        description: `Report #${report.id} assigned to team "${team.name}"${options.note ? `: ${options.note}` : ''}`,
+        description: options.actor.system
+          ? `Report #${report.id} auto-assigned by SYSTEM to team "${team.name}"${options.note ? ` — ${options.note}` : ''}`
+          : `Report #${report.id} assigned to team "${team.name}"${options.note ? `: ${options.note}` : ''}`,
         requestId: options.requestId ?? null,
         ipAddress: options.ipAddress ?? null,
         userAgent: options.userAgent ?? null,

@@ -10,7 +10,19 @@
 // logs, and the cascade of a deleted report's status history. These were checked against Prisma 6.19
 // and PostgreSQL while writing the tests.
 
-const MODELS = ['user', 'report', 'team', 'activityLog', 'reportStatusHistory', 'slaPolicy', 'notificationOutbox'];
+const MODELS = [
+  'user',
+  'report',
+  'team',
+  'activityLog',
+  'reportStatusHistory',
+  'slaPolicy',
+  'notificationOutbox',
+  'duplicateCandidate',
+  'reportFollower',
+  'mergeRecord',
+  'assignmentDecision',
+];
 
 const REQUIRED = {
   user: ['email', 'password', 'firstName', 'lastName'],
@@ -20,21 +32,55 @@ const REQUIRED = {
   reportStatusHistory: ['reportId', 'toStatus'],
   slaPolicy: ['category', 'responseMinutes', 'resolutionMinutes'],
   notificationOutbox: ['dedupeKey', 'kind', 'recipientEmail', 'subject', 'body'],
+  duplicateCandidate: ['reportId', 'candidateId', 'score'],
+  reportFollower: ['reportId', 'userId'],
+  mergeRecord: ['duplicateId', 'canonicalId'],
+  assignmentDecision: ['reportId', 'mode'],
 };
 
 const RELATIONS = {
-  user: { reports: { model: 'report', fk: 'userId', many: true } },
-  team: { reports: { model: 'report', fk: 'assignedTeamId', many: true } },
+  user: {
+    reports: { model: 'report', fk: 'userId', many: true },
+    followers: { model: 'reportFollower', fk: 'userId', many: true },
+  },
+  team: {
+    reports: { model: 'report', fk: 'assignedTeamId', many: true },
+    assignments: { model: 'assignmentDecision', fk: 'teamId', many: true },
+  },
   report: {
     user: { model: 'user', fk: 'userId', many: false },
     team: { model: 'team', fk: 'assignedTeamId', many: false },
     history: { model: 'reportStatusHistory', fk: 'reportId', many: true },
     notifications: { model: 'notificationOutbox', fk: 'reportId', many: true },
+    duplicateOf: { model: 'report', fk: 'duplicateOfId', many: false },
+    duplicates: { model: 'report', fk: 'duplicateOfId', many: true },
+    duplicateCandidates: { model: 'duplicateCandidate', fk: 'reportId', many: true },
+    candidateFor: { model: 'duplicateCandidate', fk: 'candidateId', many: true },
+    followers: { model: 'reportFollower', fk: 'reportId', many: true },
+    mergeRecords: { model: 'mergeRecord', fk: 'duplicateId', many: true },
+    mergedIntoRecords: { model: 'mergeRecord', fk: 'canonicalId', many: true },
+    assignmentDecisions: { model: 'assignmentDecision', fk: 'reportId', many: true },
   },
   activityLog: { user: { model: 'user', fk: 'userId', many: false } },
   reportStatusHistory: { report: { model: 'report', fk: 'reportId', many: false } },
   notificationOutbox: { report: { model: 'report', fk: 'reportId', many: false } },
   slaPolicy: {},
+  duplicateCandidate: {
+    report: { model: 'report', fk: 'reportId', many: false },
+    candidate: { model: 'report', fk: 'candidateId', many: false },
+  },
+  reportFollower: {
+    report: { model: 'report', fk: 'reportId', many: false },
+    user: { model: 'user', fk: 'userId', many: false },
+  },
+  mergeRecord: {
+    duplicate: { model: 'report', fk: 'duplicateId', many: false },
+    canonical: { model: 'report', fk: 'canonicalId', many: false },
+  },
+  assignmentDecision: {
+    report: { model: 'report', fk: 'reportId', many: false },
+    team: { model: 'team', fk: 'teamId', many: false },
+  },
 };
 
 const DEFAULTS = {
@@ -63,12 +109,22 @@ const DEFAULTS = {
     afterPhotoUrl: null,
     resolvedAt: null,
     closedAt: null,
+    closureReason: null,
     reopenCount: 0,
     responseDueAt: null,
     resolutionDueAt: null,
     slaCycleStartedAt: null,
+    duplicateOfId: null,
   }),
-  team: () => ({ municipality: null, latitude: null, longitude: null, isActive: true }),
+  team: () => ({
+    municipality: null,
+    latitude: null,
+    longitude: null,
+    isActive: true,
+    capacity: 10,
+    maxRadiusKm: 20,
+    autoAssignEnabled: false,
+  }),
   activityLog: () => ({ description: null, ipAddress: null, userAgent: null, requestId: null }),
   reportStatusHistory: () => ({
     fromStatus: null,
@@ -87,6 +143,10 @@ const DEFAULTS = {
     sentAt: null,
     lastError: null,
   }),
+  duplicateCandidate: () => ({ distanceM: null, status: 'SUGGESTED', resolvedAt: null }),
+  reportFollower: () => ({}),
+  mergeRecord: () => ({ mergedById: null, undoneById: null, undoneAt: null }),
+  assignmentDecision: () => ({ teamId: null, score: null, runnerUpScore: null, reasons: null }),
 };
 
 function prismaError(code, message) {
@@ -156,6 +216,32 @@ function paginate(rows, { skip = 0, take } = {}) {
   return take === undefined ? rows.slice(start) : rows.slice(start, start + take);
 }
 
+// The unique key of a row, or null when the model has none beyond its id. Used by createMany's
+// skipDuplicates, which must respect every @@unique in the schema.
+function uniqueKey(model, row) {
+  switch (model) {
+    case 'user':
+      return `email:${row.email}`;
+    case 'slaPolicy':
+      return `category:${row.category}`;
+    case 'notificationOutbox':
+      return `dedupe:${row.dedupeKey}`;
+    case 'duplicateCandidate':
+      return `pair:${row.reportId}:${row.candidateId}`;
+    case 'reportFollower':
+      return `pair:${row.reportId}:${row.userId}`;
+    case 'mergeRecord':
+      return `duplicate:${row.duplicateId}`;
+    default:
+      return null;
+  }
+}
+
+function duplicateRowIn(rows, model, data) {
+  const key = uniqueKey(model, data);
+  return key !== null && rows.some((row) => uniqueKey(model, row) === key);
+}
+
 function createFakePrisma() {
   const tables = {};
   const counters = {};
@@ -187,14 +273,8 @@ function createFakePrisma() {
         throw validationError(`Argument \`${field}\` is missing.`);
       }
     }
-    if (model === 'user' && tables.user.some((u) => u.email === data.email)) {
-      throw prismaError('P2002', 'Unique constraint failed on the fields: (`email`)');
-    }
-    if (model === 'slaPolicy' && tables.slaPolicy.some((row) => row.category === data.category)) {
-      throw prismaError('P2002', 'Unique constraint failed on the fields: (`category`)');
-    }
-    if (model === 'notificationOutbox' && tables.notificationOutbox.some((row) => row.dedupeKey === data.dedupeKey)) {
-      throw prismaError('P2002', 'Unique constraint failed on the fields: (`dedupeKey`)');
+    if (duplicateRowIn(tables[model], model, data)) {
+      throw prismaError('P2002', `Unique constraint failed on ${model}`);
     }
     if (model === 'notificationOutbox' && data.reportId != null) {
       if (!tables.report.some((r) => r.id === data.reportId)) {
@@ -211,8 +291,45 @@ function createFakePrisma() {
         throw prismaError('P2003', 'Foreign key constraint violated on `assignedTeamId`');
       }
     }
+    if (model === 'report' && data.duplicateOfId != null) {
+      if (!tables.report.some((r) => r.id === data.duplicateOfId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `duplicateOfId`');
+      }
+    }
     if (model === 'reportStatusHistory' && !tables.report.some((r) => r.id === data.reportId)) {
       throw prismaError('P2003', 'Foreign key constraint violated on `reportId`');
+    }
+    if (model === 'duplicateCandidate') {
+      if (!tables.report.some((r) => r.id === data.reportId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `reportId`');
+      }
+      if (!tables.report.some((r) => r.id === data.candidateId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `candidateId`');
+      }
+    }
+    if (model === 'reportFollower') {
+      if (!tables.report.some((r) => r.id === data.reportId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `reportId`');
+      }
+      if (!tables.user.some((u) => u.id === data.userId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `userId`');
+      }
+    }
+    if (model === 'mergeRecord') {
+      if (!tables.report.some((r) => r.id === data.duplicateId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `duplicateId`');
+      }
+      if (!tables.report.some((r) => r.id === data.canonicalId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `canonicalId`');
+      }
+    }
+    if (model === 'assignmentDecision') {
+      if (!tables.report.some((r) => r.id === data.reportId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `reportId`');
+      }
+      if (data.teamId != null && !tables.team.some((t) => t.id === data.teamId)) {
+        throw prismaError('P2003', 'Foreign key constraint violated on `teamId`');
+      }
     }
 
     counters[model] += 1;
@@ -222,6 +339,7 @@ function createFakePrisma() {
       ...DEFAULTS[model](),
       createdAt: timestamp,
       ...(model === 'report' && { updatedAt: timestamp }),
+      ...(model === 'mergeRecord' && { updatedAt: timestamp }),
       ...data,
     };
     tables[model].push(row);
@@ -308,7 +426,7 @@ function createFakePrisma() {
         row[key] = value;
       }
     }
-    if (model === 'report') row.updatedAt = now();
+    if (model === 'report' || model === 'mergeRecord') row.updatedAt = now();
     return row;
   }
 
@@ -342,16 +460,13 @@ function createFakePrisma() {
       },
       async createMany({ data, skipDuplicates = false } = {}) {
         let count = 0;
+        const keys = new Set(tables[model].map((row) => uniqueKey(model, row)).filter(Boolean));
         for (const item of data) {
-          if (
-            skipDuplicates &&
-            model === 'notificationOutbox' &&
-            tables.notificationOutbox.some((row) => row.dedupeKey === item.dedupeKey)
-          ) {
-            continue;
-          }
+          const key = uniqueKey(model, item);
+          if (skipDuplicates && key !== null && keys.has(key)) continue;
           insert(model, item);
           count += 1;
+          if (key !== null) keys.add(key);
         }
         return { count };
       },
@@ -378,10 +493,22 @@ function createFakePrisma() {
             throw error;
           }
           tables.activityLog = tables.activityLog.filter((log) => log.userId !== row.id);
+          tables.reportFollower = tables.reportFollower.filter((follower) => follower.userId !== row.id);
         }
         if (model === 'report') {
           tables.reportStatusHistory = tables.reportStatusHistory.filter((history) => history.reportId !== row.id);
           tables.notificationOutbox = tables.notificationOutbox.filter((notice) => notice.reportId !== row.id);
+          tables.duplicateCandidate = tables.duplicateCandidate.filter(
+            (link) => link.reportId !== row.id && link.candidateId !== row.id,
+          );
+          tables.reportFollower = tables.reportFollower.filter((follower) => follower.reportId !== row.id);
+          tables.mergeRecord = tables.mergeRecord.filter(
+            (merge) => merge.duplicateId !== row.id && merge.canonicalId !== row.id,
+          );
+          tables.assignmentDecision = tables.assignmentDecision.filter((decision) => decision.reportId !== row.id);
+          for (const other of tables.report) {
+            if (other.duplicateOfId === row.id) other.duplicateOfId = null;
+          }
         }
         tables[model] = tables[model].filter((r) => r !== row);
         return project(model, row);
