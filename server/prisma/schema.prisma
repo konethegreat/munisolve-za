@@ -9,22 +9,23 @@ datasource db {
 }
 
 model User {
-  id               Int          @id @default(autoincrement())
-  email            String       @unique
+  id               Int              @id @default(autoincrement())
+  email            String           @unique
   password         String
   firstName        String
   lastName         String
-  googleId         String?      @unique
+  googleId         String?          @unique
   phone            String?
-  role             String       @default("CITIZEN")
-  isActive         Boolean      @default(true)
-  isVerified       Boolean      @default(false)
+  role             String           @default("CITIZEN")
+  isActive         Boolean          @default(true)
+  isVerified       Boolean          @default(false)
   lastLogin        DateTime?
   emailVerifToken  String?
   emailVerifExpiry DateTime?
-  createdAt        DateTime     @default(now())
+  createdAt        DateTime         @default(now())
   reports          Report[]
   activityLogs     ActivityLog[]
+  followers        ReportFollower[]
 
   @@index([role, isActive])
 }
@@ -47,54 +48,132 @@ model ActivityLog {
 }
 
 model Team {
-  id             Int      @id @default(autoincrement())
-  name           String
-  specialization String
-  municipality   String?
-  latitude       Float?
-  longitude      Float?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  reports        Report[]
+  id                Int                  @id @default(autoincrement())
+  name              String
+  specialization    String
+  municipality      String?
+  latitude          Float?
+  longitude         Float?
+  isActive          Boolean              @default(true)
+  capacity          Int                  @default(10)
+  maxRadiusKm       Float                @default(20)
+  autoAssignEnabled Boolean              @default(false)
+  createdAt         DateTime             @default(now())
+  reports           Report[]
+  assignments       AssignmentDecision[]
 
   @@index([isActive])
 }
 
 model Report {
-  id               Int                   @id @default(autoincrement())
-  title            String
-  description      String
-  category         String
-  municipality     String
-  address          String?
-  latitude         Float?
-  longitude        Float?
-  status           String                @default("PENDING")
-  weatherTemp      Float?
-  weatherCondition String?
-  weatherRainfall  Float?
-  weatherWind      Float?
-  weatherHumidity  Float?
-  assignedTeamId   Int?
-  team             Team?                 @relation(fields: [assignedTeamId], references: [id])
-  assignedAt       DateTime?
-  afterPhotoUrl    String?
-  resolvedAt       DateTime?
-  closedAt         DateTime?
-  reopenCount      Int                   @default(0)
-  responseDueAt     DateTime?
-  resolutionDueAt   DateTime?
-  slaCycleStartedAt DateTime?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  userId           Int
-  user             User                  @relation(fields: [userId], references: [id])
-  history          ReportStatusHistory[]
-  notifications    NotificationOutbox[]
+  id                  Int                   @id @default(autoincrement())
+  title               String
+  description         String
+  category            String
+  municipality        String
+  address             String?
+  latitude            Float?
+  longitude           Float?
+  status              String                @default("PENDING")
+  weatherTemp         Float?
+  weatherCondition    String?
+  weatherRainfall     Float?
+  weatherWind         Float?
+  weatherHumidity     Float?
+  assignedTeamId      Int?
+  team                Team?                 @relation(fields: [assignedTeamId], references: [id])
+  assignedAt          DateTime?
+  afterPhotoUrl       String?
+  resolvedAt          DateTime?
+  closedAt            DateTime?
+  closureReason       String?
+  reopenCount         Int                   @default(0)
+  responseDueAt       DateTime?
+  resolutionDueAt     DateTime?
+  slaCycleStartedAt   DateTime?
+  duplicateOfId       Int?
+  duplicateOf         Report?               @relation("ReportDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates          Report[]              @relation("ReportDuplicates")
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  userId              Int
+  user                User                  @relation(fields: [userId], references: [id])
+  history             ReportStatusHistory[]
+  notifications       NotificationOutbox[]
+  duplicateCandidates DuplicateCandidate[]  @relation("ReportDuplicateCandidates")
+  candidateFor        DuplicateCandidate[]  @relation("CandidateDuplicateCandidates")
+  followers           ReportFollower[]
+  mergeRecords        MergeRecord[]         @relation("MergeDuplicateReport")
+  mergedIntoRecords   MergeRecord[]         @relation("MergeCanonicalReport")
+  assignmentDecisions AssignmentDecision[]
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([assignedTeamId, status])
+  @@index([duplicateOfId])
+  @@index([category, status, createdAt])
+  @@index([latitude, longitude])
+}
+
+model DuplicateCandidate {
+  id          Int       @id @default(autoincrement())
+  reportId    Int
+  report      Report    @relation("ReportDuplicateCandidates", fields: [reportId], references: [id], onDelete: Cascade)
+  candidateId Int
+  candidate   Report    @relation("CandidateDuplicateCandidates", fields: [candidateId], references: [id], onDelete: Cascade)
+  score       Float
+  distanceM   Float?
+  status      String    @default("SUGGESTED")
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([reportId, candidateId])
+  @@index([reportId, status])
+  @@index([candidateId])
+}
+
+model ReportFollower {
+  id        Int      @id @default(autoincrement())
+  reportId  Int
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([reportId, userId])
+  @@index([userId])
+}
+
+model MergeRecord {
+  id          Int       @id @default(autoincrement())
+  duplicateId Int       @unique
+  duplicate   Report    @relation("MergeDuplicateReport", fields: [duplicateId], references: [id], onDelete: Cascade)
+  canonicalId Int
+  canonical   Report    @relation("MergeCanonicalReport", fields: [canonicalId], references: [id], onDelete: Cascade)
+  mergedById  Int?
+  undoneById  Int?
+  undoneAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([canonicalId])
+  @@index([undoneAt])
+}
+
+model AssignmentDecision {
+  id            Int      @id @default(autoincrement())
+  reportId      Int
+  report        Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  teamId        Int?
+  team          Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  mode          String
+  score         Float?
+  runnerUpScore Float?
+  reasons       String?
+  createdAt     DateTime @default(now())
+
+  @@index([reportId, createdAt])
+  @@index([mode, createdAt])
 }
 
 model ReportStatusHistory {
@@ -123,22 +202,22 @@ model SlaPolicy {
 }
 
 model NotificationOutbox {
-  id             Int      @id @default(autoincrement())
-  dedupeKey      String   @unique
+  id             Int       @id @default(autoincrement())
+  dedupeKey      String    @unique
   kind           String
   reportId       Int?
-  report         Report?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report         Report?   @relation(fields: [reportId], references: [id], onDelete: Cascade)
   recipientEmail String
   subject        String
   body           String
-  status         String   @default("PENDING")
-  attempts       Int      @default(0)
-  maxAttempts    Int      @default(5)
-  nextAttemptAt  DateTime @default(now())
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(5)
+  nextAttemptAt  DateTime  @default(now())
   sentAt         DateTime?
   lastError      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([status, nextAttemptAt])
   @@index([reportId])

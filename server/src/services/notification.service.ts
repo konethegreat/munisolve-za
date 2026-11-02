@@ -4,6 +4,7 @@ import { addMinutes } from '../domain/sla';
 import type { NotificationDraft } from '../domain/sla';
 import { planDueNotifications } from './sla.service';
 import { isEmailConfigured, sendNotificationEmail } from './email.service';
+import { evaluateAutoAssignments } from './autoAssignment.service';
 
 export const OUTBOX_BATCH_SIZE = 25;
 export const LEASE_MINUTES = 10;
@@ -20,6 +21,7 @@ export interface TickOptions {
   send?: SendEmail;
   configured?: boolean;
   clientUrl?: string;
+  autoAssign?: boolean;
 }
 
 export interface TickSummary {
@@ -28,6 +30,8 @@ export interface TickSummary {
   sent: number;
   failed: number;
   skipped: number;
+  autoAssigned: number;
+  decisions: number;
 }
 
 interface ProcessSummary {
@@ -139,8 +143,9 @@ export async function runTick(options: TickOptions = {}): Promise<TickSummary> {
   const now = options.now ?? new Date();
   const client = options.client ?? prisma;
 
+  const assignment = await evaluateAutoAssignments({ now, client, enabled: options.autoAssign });
   const drafts = await planDueNotifications({ now, client, clientUrl: options.clientUrl });
-  const enqueued = await enqueueNotifications(drafts, now, client);
+  const enqueued = await enqueueNotifications([...assignment.notifications, ...drafts], now, client);
   const processed = await processOutbox({
     now,
     client,
@@ -149,5 +154,10 @@ export async function runTick(options: TickOptions = {}): Promise<TickSummary> {
     configured: options.configured,
   });
 
-  return { enqueued, ...processed };
+  return {
+    enqueued,
+    ...processed,
+    autoAssigned: assignment.autoAssigned,
+    decisions: assignment.decisions,
+  };
 }

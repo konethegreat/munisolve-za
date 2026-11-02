@@ -24,6 +24,7 @@ const env = {
   JWT_SECRET: randomBytes(32).toString('hex'),
   JWT_EXPIRES_IN: '1h',
   TICK_SECRET: randomBytes(16).toString('hex'),
+  AUTO_ASSIGN_ENABLED: 'true',
   DEMO_PASSWORD: verify ? `${randomBytes(20).toString('hex')}Aa1!` : requirePassword(),
   POSTGRES_PASSWORD: randomBytes(24).toString('hex'),
   ANTHROPIC_API_KEY: '', ANTHROPIC_AUTH_TOKEN: '', RESEND_API_KEY: '',

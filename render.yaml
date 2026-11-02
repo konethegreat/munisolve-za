@@ -12,3 +12,5 @@ services:
         value: production
       - key: TICK_SECRET
         sync: false
+      - key: AUTO_ASSIGN_ENABLED
+        value: "false"
