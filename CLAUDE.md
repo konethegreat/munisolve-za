@@ -315,12 +315,15 @@ GET    /holidays                      24-hr cache  — Nager.Date SA holidays (k
 ## Supervisor Workflow — Status State Machine
 
 ```
-PENDING → ASSIGNED    (supervisor assigns to a Team via /assign)
-ASSIGNED → IN_PROGRESS (supervisor/crew starts work)
-IN_PROGRESS → RESOLVED (requires afterPhotoUrl — enforced in supervisor.controller.js)
-RESOLVED → CLOSED      (supervisor closes ticket)
-Any state → REJECTED   (supervisor rejects)
+PENDING → ASSIGNED | IN_PROGRESS | RESOLVED | REJECTED
+ASSIGNED → ASSIGNED (reassign) | IN_PROGRESS | REJECTED
+IN_PROGRESS → RESOLVED | REJECTED
+RESOLVED → CLOSED | IN_PROGRESS (reopen)
+CLOSED → IN_PROGRESS (reopen)
+REJECTED → PENDING (reopen)
 ```
+
+Assignment goes through `PATCH /api/supervisor/reports/:id/assign`; the status endpoint rejects `ASSIGNED`. The canonical matrix and role gates live in `server/src/domain/reportStateMachine.ts`, and every transition is written with history and an activity row in `server/src/services/report.service.ts`. `SUPER_ADMIN` may force any transition with a reason of at least 10 characters, audited as `OVERRIDE_STATUS`.
 
 Proximity matching in `getTeamSuggestions`: Haversine distance + category→specialization keyword scoring. Teams sorted by `specScore * 10 + muniMatch * 5 - distanceKm`.
 
