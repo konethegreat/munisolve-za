@@ -1,5 +1,6 @@
-// Standalone test for the DB retry helpers.
-// No test framework is configured, so run directly:  node src/config/retry.test.js
+// Test for the DB retry helpers.
+// `npm test` collects this file with node --test; to run it alone:
+//   npx tsx src/config/retry.test.js
 const assert = require('node:assert');
 const { isRetryableError, withRetry } = require('./retry');
 

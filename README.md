@@ -67,9 +67,9 @@ npm --prefix server run db:push
 npm --prefix server run dev
 ```
 
-In another terminal, run `npm --prefix client run dev`. The client defaults to `http://localhost:5000/api`; use `VITE_API_URL` to change it. Configure `VITE_GOOGLE_CLIENT_ID` and matching server `GOOGLE_CLIENT_ID` to enable Google sign-in. The current schema is managed with `prisma db push`; hosted databases do not have synchronized migration history.
+In another terminal, run `npm --prefix client run dev`. The client defaults to `http://localhost:5000/api`; use `VITE_API_URL` to change it. Configure `VITE_GOOGLE_CLIENT_ID` and matching server `GOOGLE_CLIENT_ID` to enable Google sign-in. `npm --prefix server run db:push` remains available as a local convenience for a disposable database, but the tracked schema history lives in `server/prisma/migrations`.
 
-The server uses Node's built-in watch mode to restart when imported source files change. Restart it manually after changing environment variables or the Prisma schema.
+The server runs under `tsx watch` and restarts when imported source files change. Restart it manually after changing environment variables or the Prisma schema.
 
 ## Roles and API entry points
 
@@ -81,6 +81,55 @@ The server uses Node's built-in watch mode to restart when imported source files
 | `SUPER_ADMIN` | Admin and supervisor endpoints |
 
 Auth: `/api/auth`; citizen reports: `/api/reports`; operations: `/api/supervisor`; administration: `/api/admin`; chat: `/api/ai`; public widgets: `/api/public`. `/health` checks API availability. Audit records are available through `/api/admin/activity-logs`; the current admin interface has reports and users tabs.
+
+## API contracts and operations
+
+Every error response uses one envelope with a request ID, so a caller can quote it when reporting a problem:
+
+```json
+{
+  "success": false,
+  "errorCode": "VALIDATION_ERROR",
+  "message": "Validation failed. Please check your input.",
+  "requestId": "3f0c7e8a-...",
+  "errors": [{ "field": "title", "message": "Title must be between 10 and 200 characters" }]
+}
+```
+
+Success payloads are unchanged. Validation errors return 400 `VALIDATION_ERROR` with field messages only. Ownership failures stay 404, so one citizen cannot distinguish a missing report from another citizen's report.
+
+Status changes run through one transaction-backed state machine:
+
+| From | Allowed |
+|---|---|
+| `PENDING` | `ASSIGNED`, `IN_PROGRESS`, `RESOLVED`, `REJECTED` |
+| `ASSIGNED` | `ASSIGNED` (reassign), `IN_PROGRESS`, `REJECTED` |
+| `IN_PROGRESS` | `RESOLVED`, `REJECTED` |
+| `RESOLVED` | `CLOSED`, `IN_PROGRESS` (reopen) |
+| `CLOSED` | `IN_PROGRESS` (reopen) |
+| `REJECTED` | `PENDING` (reopen) |
+
+Invalid transitions return 409 `INVALID_TRANSITION`. Citizens can only resolve their own `PENDING` or `IN_PROGRESS` reports; a supervisor resolution requires an after-photo URL; a `SUPER_ADMIN` override requires a reason of at least 10 characters. Every change writes a `ReportStatusHistory` row and keeps the existing `ActivityLog` action names.
+
+`GET /health` is a DB-free liveness probe used by Render and the keep-alive monitor, so it does not wake Neon. `GET /ready` checks the database and the migrations table and returns 200 with `database: "up"` and `migrations: "current"`, or 503.
+
+`DATABASE_URL` is the pooled Neon connection string used by the API. `DIRECT_URL` is the direct Neon URL used only by migrations.
+
+Local commands, from `server/`:
+
+```sh
+npm run dev
+npm run typecheck
+npm test
+npm run build
+npm run demo:verify
+```
+
+Schema changes ship as versioned migrations in `server/prisma/migrations`; production, CI and `demo:verify` run `prisma migrate deploy` only. Before the first deployment that uses `migrate deploy`, run this once against the existing production database to mark the baseline as already applied:
+
+```sh
+npx prisma migrate resolve --applied 20261102000000_baseline
+```
 
 ## Evidence and limits
 

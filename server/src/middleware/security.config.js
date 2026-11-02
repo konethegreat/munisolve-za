@@ -450,7 +450,7 @@ Before deploying to production:
 ✅ 9. Input Validation
    - Validate ALL user input
    - Sanitize HTML/scripts
-   - Use express-validator
+   - Validate with the Zod schemas in server/src/schemas
 
 ✅ 10. Authentication
    - Use bcrypt for passwords

@@ -126,7 +126,7 @@ munisolve-za/
 
 ## Database Schema (Prisma)
 
-> **Schema management:** `prisma db push` is used (not `prisma migrate dev`) because the DB was initially set up without Prisma migration history. Always use `npx prisma db push` for schema changes.
+> **Schema management:** Schema changes ship as versioned migrations in `server/prisma/migrations`. Production, CI and `demo:verify` run `prisma migrate deploy`; the baseline was marked as applied once. Do not use `prisma db push` against a database whose migration history matters.
 
 ```prisma
 model User {
@@ -364,14 +364,19 @@ after ownership validation and report submission returns `aiResponse: null`.
 ```bash
 # Backend
 cd server
-npm install
-npx prisma db push          # sync schema to Neon (DO NOT use prisma migrate dev)
+npm ci --include=dev        # install dependencies, including build tooling
+npx prisma generate         # generate the Prisma client
+npx prisma migrate deploy   # apply the versioned migrations
+npm run typecheck           # tsc --noEmit
+npm test                    # node --test with tsx
+npm run build               # tsc → dist/server.js
+npm run dev                 # tsx watch src/server.js
+npm run demo:verify         # disposable PostgreSQL 16 HTTP workflow
 npx prisma studio           # visual DB browser
-npm run dev                 # Node built-in watch mode
 
 # Frontend
 cd client
-npm install
+npm ci
 npm run dev                 # Vite dev server → http://localhost:5173
 npm run build               # production build
 npm run lint                # ESLint
@@ -383,18 +388,24 @@ npm run lint                # ESLint
 
 | Service | What | Key config |
 |---|---|---|
-| **Render** | Express API | All server env vars set; `trust proxy 1` already set |
+| **Render** | Express API | All server env vars set; `trust proxy 1` already set; health check `/health` |
 | **Vercel** | React SPA | `vercel.json` rewrites all paths to `index.html`; `VITE_GOOGLE_CLIENT_ID` must be set |
-| **Neon** | PostgreSQL | Serverless; `DATABASE_URL` in Render env |
+| **Neon** | PostgreSQL | Serverless; `DATABASE_URL` (pooled) and `DIRECT_URL` (direct, migrations only) in Render env |
 | **Resend** | Transactional email | `RESEND_API_KEY` + `RESEND_FROM_EMAIL` in Render env |
 | **Google Cloud** | OAuth | Authorized JS origins must include both `localhost:5173` and the Vercel production URL |
+
+Render builds with `npm ci --include=dev && npx prisma generate && npm run build` and starts with `npx prisma migrate deploy && node dist/server.js`. `GET /health` is DB-free liveness; `GET /ready` checks the database and migrations. Before the first deployment that uses `migrate deploy`, mark the baseline as applied once against the existing production database:
+
+```bash
+npx prisma migrate resolve --applied 20261102000000_baseline
+```
 
 ---
 
 ## Key Patterns & Gotchas
 
 - **Prisma client** is a singleton in `server/src/config/db.config.js` — always import from there, never instantiate a new `PrismaClient`.
-- **Schema changes** — always use `npx prisma db push`, never `prisma migrate dev`. Migration history is not in sync with the Neon DB.
+- **Schema changes** — add a versioned migration in `server/prisma/migrations`; production, CI and `demo:verify` use `prisma migrate deploy`. Do not use `prisma db push` against a database whose migration history matters.
 - **Roles** — the actual role strings are `CITIZEN`, `MUNICIPAL_ADMIN`, `SUPER_ADMIN`, `WORKER_SUPERVISOR`. The old CLAUDE.md incorrectly said `ADMIN`/`SUPERADMIN` — those are wrong.
 - **Google OAuth** — uses explicit `findUnique` + `update/create` instead of `upsert`. The upsert caused Prisma "invalid invocation" errors due to dual unique fields (`email` + `googleId`). Do not revert to upsert.
 - **Google JWT payload** — signed as `{ userId, email, role }`. The `googleLogin` handler previously used `{ id }` which broke `auth.middleware.js` (reads `decoded.userId`). Fixed.

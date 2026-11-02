@@ -33,7 +33,7 @@ describe('report transitions', () => {
     const res = await h.api('PATCH', `/api/reports/${report.id}/status`, {
       token: as(citizen),
       body: { status: 'RESOLVED', note: 'Fixed, thanks' },
-      headers: { 'x-request-id': 'test-request-1234' },
+      headers: { 'x-request-id': 'test-request-1234', 'user-agent': 'test-agent' },
     });
 
     assert.equal(res.status, 200);
@@ -46,7 +46,7 @@ describe('report transitions', () => {
     assert.equal(activity.requestId, 'test-request-1234');
     assert.equal(typeof activity.ipAddress, 'string');
     assert.ok(activity.ipAddress.length > 0);
-    assert.notEqual(activity.userAgent, undefined);
+    assert.equal(activity.userAgent, 'test-agent');
   });
 
   test('a supervisor uses the same service and history, with REPORT_STATUS_CHANGED', async () => {
