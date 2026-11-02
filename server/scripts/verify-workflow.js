@@ -44,7 +44,7 @@ async function verifyWorkflow(baseURL, password, tickSecret) {
   const report = created.data;
   assert.equal(report.status, 'PENDING');
   assert.equal(report.aiResponse, null, 'Report creation works without an AI credential.');
-  assert.equal(report.weatherTemp, null, 'Weather is absent without a credential.');
+  assert.equal(report.weatherTemp, null, 'Weather is disabled in the demo environment.');
   const route = `/reports/${report.id}`;
   async function citizenSees(status) {
     const seen = await request(`Citizen sees ${status}`, 'GET', route, 200, tokens.citizenA);
@@ -101,6 +101,23 @@ async function verifyWorkflow(baseURL, password, tickSecret) {
   assert.equal(tick.data.autoAssigned, 0);
   assert.equal(tick.data.decisions, 0);
 
+  const hook = await request('Admin registers a synthetic webhook receiver', 'POST', '/admin/webhooks', 201, tokens.admin, {
+    url: 'https://example.invalid/munisolve-demo-hook',
+    events: ['report.status_changed'],
+    description: 'Synthetic receiver used by the disposable demo.',
+  });
+  assert.match(hook.data.secret, /^whsec_[0-9a-f]{48}$/, 'The secret is shown once, on creation.');
+  const hooks = await request('Admin lists webhooks without their secrets', 'GET', '/admin/webhooks', 200, tokens.admin);
+  assert.ok(hooks.data.some((entry) => entry.id === hook.data.id));
+  assert.ok(hooks.data.every((entry) => !('secret' in entry)));
+  const rotated = await request('Admin rotates the webhook secret', 'POST',
+    `/admin/webhooks/${hook.data.id}/rotate-secret`, 200, tokens.admin);
+  assert.notEqual(rotated.data.secret, hook.data.secret);
+  const deliveries = await request('The new webhook has no deliveries yet', 'GET',
+    `/admin/webhooks/${hook.data.id}/deliveries`, 200, tokens.admin);
+  assert.equal(deliveries.data.length, 0);
+  await request('Admin deletes the webhook', 'DELETE', `/admin/webhooks/${hook.data.id}`, 200, tokens.admin);
+
   const canonical = await request('Citizen A files a fictional report for duplicate checks', 'POST', '/reports', 201, tokens.citizenA, {
     title: 'Demo duplicates: broken paving on Synthetic Street',
     description: 'Synthetic walkthrough only. Broken paving used for the duplicate workflow.',
@@ -132,7 +149,8 @@ async function verifyWorkflow(baseURL, password, tickSecret) {
   console.log(JSON.stringify({ result: 'passed', database: 'disposable PostgreSQL 16', steps,
     lifecycle: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'],
     duplicateLifecycle: ['SUGGESTED', 'MERGED', 'CLOSED', 'UNMERGED', 'PENDING'],
-    limitations: ['No real municipal submission', 'No AI, email, Google OAuth or weather provider verification',
+    webhookLifecycle: ['CREATED', 'ROTATED', 'DELETED'],
+    limitations: ['No real municipal submission', 'No AI, email, Google OAuth, weather, geocoding or webhook receiver verification',
       'Auto-assignment only runs for reports older than five minutes, so the tick has nothing to assign here',
       'Photo is a placeholder URL; no upload or repair verification', 'HTTP workflow; browser walkthrough is separate'],
   }, null, 2));

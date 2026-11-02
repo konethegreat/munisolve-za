@@ -1,8 +1,10 @@
 import prisma from '../config/db.config';
+import { logger } from '../logger';
 import { AppError } from '../errors/AppError';
 import { ALLOWED_TRANSITIONS, canTransition } from '../domain/reportStateMachine';
 import type { ReportStatus, Role } from '../domain/reportStateMachine';
 import { resetResolutionWindow } from './sla.service';
+import { enqueueReportEvent } from './webhook.service';
 
 export type TransitionSource = 'reports' | 'supervisor' | 'admin';
 
@@ -71,9 +73,11 @@ function transitionDescription(source: TransitionSource, reportId: number, from:
 }
 
 export async function transitionReport(options: TransitionOptions) {
-  return prisma.$transaction(async (tx) => {
+  let fromStatus: string | null = null;
+  const updated = await prisma.$transaction(async (tx) => {
     const report = await tx.report.findUnique({ where: { id: options.reportId } });
     if (!report) throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found.');
+    fromStatus = report.status;
 
     // The citizen route ("reports", source of PATCH /api/reports/:id/status) is auth-only, so it must
     // not disclose whether a foreign report exists. Check ownership before any other guard (including
@@ -176,10 +180,22 @@ export async function transitionReport(options: TransitionOptions) {
 
     return updated;
   });
+
+  try {
+    await enqueueReportEvent({
+      event: 'report.status_changed',
+      report: updated,
+      extra: { fromStatus, toStatus: options.nextStatus, source: options.source },
+    });
+  } catch (error) {
+    logger.warn({ err: error, reportId: options.reportId }, 'Webhook enqueue failed');
+  }
+
+  return updated;
 }
 
 export async function assignReport(options: AssignOptions) {
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const report = await tx.report.findUnique({ where: { id: options.reportId } });
     if (!report) throw new AppError(404, 'REPORT_NOT_FOUND', 'Report not found.');
 
@@ -234,4 +250,16 @@ export async function assignReport(options: AssignOptions) {
 
     return updated;
   });
+
+  try {
+    await enqueueReportEvent({
+      event: 'report.assigned',
+      report: updated,
+      extra: { teamId: options.teamId, system: Boolean(options.actor.system) },
+    });
+  } catch (error) {
+    logger.warn({ err: error, reportId: options.reportId }, 'Webhook enqueue failed');
+  }
+
+  return updated;
 }

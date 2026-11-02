@@ -14,10 +14,10 @@ A South African civic-tech portfolio project by **Kone Tshivhinda**. Citizens re
 - A required after-photo URL on the supervisor resolution endpoint.
 - Municipal admin report and user management, with an activity-log API.
 - JWT authentication, bcrypt passwords, current database role/account checks, Helmet headers, CORS and rate limits.
-- Optional Siyanda (Anthropic), Resend email verification, Google sign-in and weather integrations; public map, holiday and air-quality widgets.
+- Optional Siyanda (Anthropic), Resend email and Google sign-in; keyless weather, air quality, holidays and geocoding; signed outbound webhooks; public map and data widgets.
 
 The reproducible path is `PENDING → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED`.
-This is a demonstrated workflow, not a strict state machine enforced by every endpoint. Admin endpoints allow direct status changes; citizens may confirm their own pending or in-progress reports as resolved.
+Transitions are enforced server-side by the table below; an invalid move returns 409.
 
 ## Stack
 
@@ -27,7 +27,8 @@ This is a demonstrated workflow, not a strict state machine enforced by every en
 | Data | PostgreSQL; Prisma 6 |
 | Interface | React 19; Vite 7; Tailwind CSS 4; React Router 7 |
 | Maps | Leaflet; React Leaflet; OpenStreetMap |
-| Optional providers | Anthropic; Resend; Google OAuth; WeatherAPI |
+| Optional providers | Anthropic; Resend; Google OAuth |
+| Keyless data | Open-Meteo (weather, air quality); Nager.Date (holidays); Nominatim (geocoding) |
 
 ## Reproduce the workflow
 
@@ -41,7 +42,7 @@ npm --prefix client ci
 npm --prefix server run demo:verify
 ```
 
-Verification creates a new PostgreSQL 16 container, seeds four fictional users and two crews, starts the real API, checks 34 HTTP steps, and removes its processes and database. It checks permissions, every lifecycle state, missing-photo rejection, keyless reporting and audit history. Credentials are generated per run and are not saved to files or printed.
+Verification creates a new PostgreSQL 16 container, seeds four fictional users and two crews, starts the real API, checks 49 HTTP steps, and removes its processes and database. It checks permissions, every lifecycle state, missing-photo rejection, keyless reporting and audit history. Credentials are generated per run and are not saved to files or printed.
 
 For the interactive interface, set a temporary `DEMO_PASSWORD` of at least 12 characters and run `npm --prefix server run demo`. The launcher prints a local login URL. [The walkthrough](docs/DEMO.md) has shell commands, accounts, expected results and screenshots. Stop with Ctrl+C to discard that database.
 
@@ -88,7 +89,7 @@ The server runs under `tsx watch` and restarts when imported source files change
 | `MUNICIPAL_ADMIN` | Admin and supervisor endpoints |
 | `SUPER_ADMIN` | Admin and supervisor endpoints |
 
-Auth: `/api/auth`; citizen reports: `/api/reports`; operations: `/api/supervisor`; administration: `/api/admin`; chat: `/api/ai`; public widgets: `/api/public`. `/health` checks API availability. Audit records are available through `/api/admin/activity-logs`; the current admin interface has reports and users tabs.
+Auth: `/api/auth`; citizen reports: `/api/reports`; operations: `/api/supervisor`; administration: `/api/admin`; chat: `/api/ai`; public widgets: `/api/public`; geocoding: `/api/geo`. `/health` checks API availability. Audit records are available through `/api/admin/activity-logs`; the current admin interface has reports and users tabs.
 
 ## API contracts and operations
 
@@ -136,6 +137,25 @@ Repository secrets required by the workflow:
 
 Email delivery uses `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Without them the outbox marks rows `SKIPPED` instead of retrying forever. Policies are seeded in the migration; changing a target is a new migration.
 
+## Integrations and webhooks
+
+Weather snapshots come from Open-Meteo and need no API key. Lookups are cached for ten minutes, time out after eight seconds and fail quietly, so a weather outage never blocks a report. Set `WEATHER_ENABLED=false` to skip them.
+
+Geocoding is proxied through `GET /api/geo/search?q=...&limit=...` and `GET /api/geo/reverse?lat=...&lon=...` so the browser never calls Nominatim directly. The proxy sends an identifying `User-Agent` (override with `GEO_USER_AGENT`), allows at most one upstream request per second, caches results for a day and restricts searches to South Africa (`GEO_COUNTRY_CODES`, default `za`). Every response carries `© OpenStreetMap contributors, ODbL` attribution. Set `GEO_ENABLED=false` to disable it.
+
+Administrators can register webhook subscriptions through `/api/admin/webhooks`. Supported events are `report.created`, `report.assigned`, `report.status_changed`, `report.merged` and `report.unmerged`. The signing secret is shown once, on creation or rotation. Each delivery carries:
+
+| Header | Value |
+|---|---|
+| `X-MuniSolve-Event` | Event name |
+| `X-MuniSolve-Delivery` | Delivery row ID |
+| `X-MuniSolve-Timestamp` | Unix seconds |
+| `X-MuniSolve-Signature` | `sha256=` + HMAC-SHA256 of `` `${timestamp}.${body}` `` |
+
+Verify the signature with the subscription secret before trusting a payload. Deliveries are stored in `WebhookDelivery` and sent by the hourly tick with bounded retries; 429, 5xx and network failures retry, other 4xx responses and private-address targets fail permanently. Subscription URLs must be public HTTPS origins; the hostname is resolved again at delivery and private addresses are refused, and redirects are not followed. Delivery history is available at `GET /api/admin/webhooks/:id/deliveries`.
+
+The API description is served at `GET /api/openapi.json`, with a dependency-free browser index at `GET /api/docs`.
+
 ## Duplicate reports and automatic assignment
 
 When a report is created with coordinates, the API compares it with open reports in the same category family: a zero-cost bounding-box query followed by a Haversine distance check and a title-similarity score. Matches above 0.65 are stored as `DuplicateCandidate` rows and returned with the creation response. A near-certain match (0.9 or more) from the same reporter is merged immediately.
@@ -162,7 +182,7 @@ npx prisma migrate resolve --applied 20261102000000_baseline
 
 ## Evidence and limits
 
-[Demo evidence](docs/DEMO.md#recorded-evidence) covers a local synthetic workflow. It does not verify the hosted Vercel/Render/Neon deployment, real municipal receipt or repairs, AI answers, email delivery or Google OAuth. The photo field stores a URL; the demo uses a placeholder rather than a verified upload. Status updates are seen after navigation or refresh. Municipal admins currently have global report visibility; municipality names are not tenant isolation.
+[Demo evidence](docs/DEMO.md#recorded-evidence) covers a local synthetic workflow. It does not verify the hosted Vercel/Render/Neon deployment, real municipal receipt or repairs, AI answers, email delivery, Google OAuth, live weather or geocoding responses, or delivery to a real webhook receiver. The photo field stores a URL; the demo uses a placeholder rather than a verified upload. Status updates are seen after navigation or refresh. Municipal admins currently have global report visibility; municipality names are not tenant isolation.
 
 The October 3, 2026 dependency refresh reduced the server and client npm audit results from 17 findings each to zero. [Dependency maintenance notes](docs/DEPENDENCIES.md) explain the Prisma override and how to reproduce the checks. This records known npm advisories on that date; workflow tests and dependency audits do not establish complete application security.
 

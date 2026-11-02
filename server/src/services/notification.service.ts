@@ -5,6 +5,7 @@ import type { NotificationDraft } from '../domain/sla';
 import { planDueNotifications } from './sla.service';
 import { isEmailConfigured, sendNotificationEmail } from './email.service';
 import { evaluateAutoAssignments } from './autoAssignment.service';
+import { processWebhookDeliveries } from './webhook.service';
 
 export const OUTBOX_BATCH_SIZE = 25;
 export const LEASE_MINUTES = 10;
@@ -22,6 +23,8 @@ export interface TickOptions {
   configured?: boolean;
   clientUrl?: string;
   autoAssign?: boolean;
+  webhookFetch?: typeof fetch;
+  resolveWebhookHost?: (hostname: string) => Promise<{ address: string; family: number }[]>;
 }
 
 export interface TickSummary {
@@ -32,6 +35,8 @@ export interface TickSummary {
   skipped: number;
   autoAssigned: number;
   decisions: number;
+  webhooksSent: number;
+  webhooksFailed: number;
 }
 
 interface ProcessSummary {
@@ -153,11 +158,20 @@ export async function runTick(options: TickOptions = {}): Promise<TickSummary> {
     send: options.send,
     configured: options.configured,
   });
+  const webhooks = await processWebhookDeliveries({
+    now,
+    client,
+    limit: options.limit,
+    fetchImpl: options.webhookFetch,
+    resolveHost: options.resolveWebhookHost,
+  });
 
   return {
     enqueued,
     ...processed,
     autoAssigned: assignment.autoAssigned,
     decisions: assignment.decisions,
+    webhooksSent: webhooks.sent,
+    webhooksFailed: webhooks.failed,
   };
 }

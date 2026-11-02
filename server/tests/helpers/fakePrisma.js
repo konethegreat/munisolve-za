@@ -22,6 +22,8 @@ const MODELS = [
   'reportFollower',
   'mergeRecord',
   'assignmentDecision',
+  'webhookSubscription',
+  'webhookDelivery',
 ];
 
 const REQUIRED = {
@@ -36,6 +38,8 @@ const REQUIRED = {
   reportFollower: ['reportId', 'userId'],
   mergeRecord: ['duplicateId', 'canonicalId'],
   assignmentDecision: ['reportId', 'mode'],
+  webhookSubscription: ['url', 'events', 'secret'],
+  webhookDelivery: ['subscriptionId', 'dedupeKey', 'event', 'payload'],
 };
 
 const RELATIONS = {
@@ -80,6 +84,12 @@ const RELATIONS = {
   assignmentDecision: {
     report: { model: 'report', fk: 'reportId', many: false },
     team: { model: 'team', fk: 'teamId', many: false },
+  },
+  webhookSubscription: {
+    deliveries: { model: 'webhookDelivery', fk: 'subscriptionId', many: true },
+  },
+  webhookDelivery: {
+    subscription: { model: 'webhookSubscription', fk: 'subscriptionId', many: false },
   },
 };
 
@@ -147,6 +157,16 @@ const DEFAULTS = {
   reportFollower: () => ({}),
   mergeRecord: () => ({ mergedById: null, undoneById: null, undoneAt: null }),
   assignmentDecision: () => ({ teamId: null, score: null, runnerUpScore: null, reasons: null }),
+  webhookSubscription: () => ({ description: null, isActive: true }),
+  webhookDelivery: () => ({
+    status: 'PENDING',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: new Date(0),
+    lastError: null,
+    responseStatus: null,
+    deliveredAt: null,
+  }),
 };
 
 function prismaError(code, message) {
@@ -232,6 +252,8 @@ function uniqueKey(model, row) {
       return `pair:${row.reportId}:${row.userId}`;
     case 'mergeRecord':
       return `duplicate:${row.duplicateId}`;
+    case 'webhookDelivery':
+      return `dedupe:${row.dedupeKey}`;
     default:
       return null;
   }
@@ -331,6 +353,9 @@ function createFakePrisma() {
         throw prismaError('P2003', 'Foreign key constraint violated on `teamId`');
       }
     }
+    if (model === 'webhookDelivery' && !tables.webhookSubscription.some((s) => s.id === data.subscriptionId)) {
+      throw prismaError('P2003', 'Foreign key constraint violated on `subscriptionId`');
+    }
 
     counters[model] += 1;
     const timestamp = now();
@@ -340,6 +365,7 @@ function createFakePrisma() {
       createdAt: timestamp,
       ...(model === 'report' && { updatedAt: timestamp }),
       ...(model === 'mergeRecord' && { updatedAt: timestamp }),
+      ...((model === 'webhookSubscription' || model === 'webhookDelivery') && { updatedAt: timestamp }),
       ...data,
     };
     tables[model].push(row);
@@ -426,7 +452,7 @@ function createFakePrisma() {
         row[key] = value;
       }
     }
-    if (model === 'report' || model === 'mergeRecord') row.updatedAt = now();
+    if (['report', 'mergeRecord', 'webhookSubscription', 'webhookDelivery'].includes(model)) row.updatedAt = now();
     return row;
   }
 
@@ -494,6 +520,9 @@ function createFakePrisma() {
           }
           tables.activityLog = tables.activityLog.filter((log) => log.userId !== row.id);
           tables.reportFollower = tables.reportFollower.filter((follower) => follower.userId !== row.id);
+        }
+        if (model === 'webhookSubscription') {
+          tables.webhookDelivery = tables.webhookDelivery.filter((delivery) => delivery.subscriptionId !== row.id);
         }
         if (model === 'report') {
           tables.reportStatusHistory = tables.reportStatusHistory.filter((history) => history.reportId !== row.id);

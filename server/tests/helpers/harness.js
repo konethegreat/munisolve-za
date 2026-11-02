@@ -68,6 +68,7 @@ async function startApp() {
   const anthropic = { calls: [], fail: false, reply: 'Stubbed assistant reply.' };
   const email = { sent: [], notifications: [] };
   const weather = { calls: [], result: null };
+  const geo = { searches: [], reverses: [] };
 
   class FakeAnthropic {
     constructor() {
@@ -102,6 +103,50 @@ async function startApp() {
       weather.calls.push([lat, lon]);
       return weather.result;
     },
+  });
+  stubModule(appPath('src/services/geo.service.js'), {
+    searchPlaces: async (query, options) => {
+      geo.searches.push([query, options]);
+      return {
+        data: {
+          results: [
+            {
+              displayName: `${query}, Johannesburg, South Africa`,
+              latitude: -26.2041,
+              longitude: 28.0473,
+              category: 'place',
+              type: 'city',
+              boundingBox: null,
+            },
+          ],
+          attribution: '© OpenStreetMap contributors, ODbL',
+        },
+        cached: false,
+      };
+    },
+    reversePlace: async (lat, lon) => {
+      geo.reverses.push([lat, lon]);
+      return {
+        data: {
+          displayName: '1 Test Street, Johannesburg, South Africa',
+          latitude: lat,
+          longitude: lon,
+          address: {
+            houseNumber: '1',
+            road: 'Test Street',
+            suburb: 'Braamfontein',
+            city: 'Johannesburg',
+            municipality: 'City of Johannesburg',
+            state: 'Gauteng',
+            postcode: '2001',
+            country: 'South Africa',
+          },
+          attribution: '© OpenStreetMap contributors, ODbL',
+        },
+        cached: false,
+      };
+    },
+    ATTRIBUTION: '© OpenStreetMap contributors, ODbL',
   });
   stubModule(packagePath('dotenv'), { config: () => ({ parsed: {} }) });
   stubModule(packagePath('@anthropic-ai/sdk'), FakeAnthropic);
@@ -180,6 +225,8 @@ async function startApp() {
     email.notifications.length = 0;
     weather.calls.length = 0;
     weather.result = null;
+    geo.searches.length = 0;
+    geo.reverses.length = 0;
     anthropic.calls.length = 0;
     anthropic.fail = false;
     anthropic.reply = 'Stubbed assistant reply.';
@@ -205,6 +252,7 @@ async function startApp() {
     notifications: email.notifications,
     tickSecret: TEST_TICK_SECRET,
     weather,
+    geo,
     secret: TEST_JWT_SECRET,
     password: TEST_PASSWORD,
     clientOrigin: TEST_CLIENT_ORIGIN,

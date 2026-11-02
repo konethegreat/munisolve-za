@@ -42,9 +42,9 @@ password; it is neither printed nor written to a file.
 | `demo.admin@example.com` | Municipal admin | All four reports and four users |
 
 These accounts are pre-verified, so no email delivery is needed. The launcher
-clears inherited AI, Resend, weather and Google credentials. Its
-`VITE_DEMO_MODE=true` enables the fictional location button and local-demo banner;
-normal development does not enable them.
+clears inherited AI, Resend and Google credentials and disables weather and
+geocoding lookups. Its `VITE_DEMO_MODE=true` enables the fictional location button
+and local-demo banner; normal development does not enable them.
 
 Maps and keyless holiday/air-quality widgets may contact public services. This
 walkthrough does not use browser geolocation, real street autocomplete, provider
@@ -84,11 +84,12 @@ npm --prefix server run demo:verify
 ```
 
 Verification needs no supplied password: it generates one without printing it.
-It checks 34 real HTTP steps against Express, Prisma and PostgreSQL: four logins,
+It checks 49 real HTTP steps against Express, Prisma and PostgreSQL: four logins,
 wrong-password rejection, anonymous and role denial, report creation, every
 status as seen by the owner, another citizen's denied read/edit/delete, crew
 suggestions and assignment, missing-photo rejection, unavailable keyless chat,
-closure, aggregate counts and five audit events in order.
+duplicate suggestion, merge and unmerge, webhook creation, rotation and deletion,
+closure, aggregate counts and audit events in order.
 
 Failures exit nonzero. The launcher removes its own processes and container on
 normal completion or handled interruption. It does not use the developer's
@@ -107,7 +108,9 @@ leftover container named `munisolve-demo-...`, labelled
 ## Recorded evidence
 
 Recorded 3 October 2026 on Windows using the real local React/Express app and
-PostgreSQL 16. Automatic verification passes all 34 HTTP steps. The manual
+PostgreSQL 16. Automatic verification passes all 49 HTTP steps, including the
+duplicate merge and unmerge path and the admin webhook lifecycle added
+after these screenshots. The manual
 browser check covers submission, citizen admin redirect, crew assignment,
 starting work, resolution, admin closure, the citizen's final timeline and
 another citizen's denied direct link. Screenshots contain fictional data only.
