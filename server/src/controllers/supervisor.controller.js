@@ -253,7 +253,7 @@ const getTeams = async (req, res) => {
 };
 
 const createTeam = async (req, res) => {
-  const { name, specialization, municipality, latitude, longitude } = req.validated.body;
+  const { name, specialization, municipality, latitude, longitude, isActive } = req.validated.body;
 
   const team = await prisma.team.create({
     data: {
@@ -262,6 +262,7 @@ const createTeam = async (req, res) => {
       ...(municipality !== undefined && { municipality }),
       ...(latitude !== undefined && { latitude }),
       ...(longitude !== undefined && { longitude }),
+      ...(isActive !== undefined && { isActive }),
     },
   });
 

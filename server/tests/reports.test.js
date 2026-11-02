@@ -274,7 +274,7 @@ describe('reports', () => {
       assert.equal(reportRow(report.id).status, 'PENDING');
     });
 
-    test('an admin can set any status, from either admin endpoint, and the owner sees it', async () => {
+    test('an admin can move a report to IN_PROGRESS and then REJECTED, from either admin endpoint, and the owner sees it', async () => {
       const report = h.makeReport(alice);
 
       const viaReports = await h.api('PATCH', `/api/reports/${report.id}/status`, {

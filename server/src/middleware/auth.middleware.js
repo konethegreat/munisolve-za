@@ -83,7 +83,7 @@ const authenticate = async (req, res, next) => {
   req.user = user;
   req.token = token;
 
-  logger.info({ userId: user.id, role: user.role }, 'User authenticated');
+  logger.info({ userId: user.id, role: user.role, requestId: req.id }, 'User authenticated');
 
   // STEP 6: Proceed to next middleware
   next();

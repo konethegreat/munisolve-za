@@ -13,6 +13,7 @@ const {
 
 const { authenticate } = require('../middleware/auth.middleware');
 const { validate } = require('../middleware/validate');
+const { AppError } = require('../errors/AppError');
 const {
   registerSchema,
   loginSchema,
@@ -34,11 +35,11 @@ router.get('/me',      authenticate, getCurrentUser);
 router.post('/logout', authenticate, logout);
 
 // ── Placeholders ───────────────────────────────────────────────────────────
-router.post('/forgot-password', passwordResetLimiter, (req, res) => {
-  res.status(501).json({ success: false, message: 'Password reset coming soon', errorCode: 'NOT_IMPLEMENTED' });
+router.post('/forgot-password', passwordResetLimiter, () => {
+  throw new AppError(501, 'NOT_IMPLEMENTED', 'Password reset coming soon');
 });
-router.post('/reset-password', (req, res) => {
-  res.status(501).json({ success: false, message: 'Password reset coming soon', errorCode: 'NOT_IMPLEMENTED' });
+router.post('/reset-password', () => {
+  throw new AppError(501, 'NOT_IMPLEMENTED', 'Password reset coming soon');
 });
 
 module.exports = router;

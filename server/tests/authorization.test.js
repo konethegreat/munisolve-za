@@ -395,6 +395,10 @@ describe('authorization', () => {
 
       assert.equal(res.status, 500);
       assert.equal(res.body.message, 'Siyanda is unavailable right now. Please try again shortly.');
+      assert.equal(res.body.errorCode, 'AI_UNAVAILABLE');
+      assert.equal(typeof res.body.requestId, 'string');
+      assert.ok(res.body.requestId.length > 0);
+      assert.equal(res.body.requestId, res.headers.get('x-request-id'));
       assert.ok(!('debug' in res.body));
     });
 

@@ -16,6 +16,22 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject edits to applied migrations
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          statuses="$(git diff --name-status "$BASE_SHA" HEAD -- server/prisma/migrations)"
+          echo "$statuses"
+          edited="$(printf '%s\n' "$statuses" | awk -F'\t' 'NF >= 2 && $1 != "A" && $2 != "" { print $2 }')"
+          if [ -n "$edited" ]; then
+            echo "Migrations already on the base branch must not be edited, renamed or deleted:"
+            echo "$edited"
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

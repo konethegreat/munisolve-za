@@ -40,11 +40,15 @@ export async function getReadiness(): Promise<ReadinessResult> {
   }
 
   try {
-    const rows = await prisma.$queryRaw<Array<{ failed: number }>>`
-      SELECT COUNT(*)::int AS failed
-      FROM "_prisma_migrations"
-      WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL
-    `;
+    // Same bound as the connection check: a wedged migrations query must not hold readiness open.
+    const rows = await withTimeout(
+      prisma.$queryRaw<Array<{ failed: number }>>`
+        SELECT COUNT(*)::int AS failed
+        FROM "_prisma_migrations"
+        WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL
+      `,
+      2000,
+    );
     checks.migrations = Number(rows[0]?.failed ?? 0) > 0 ? 'pending' : 'current';
   } catch {
     checks.migrations = 'unknown';

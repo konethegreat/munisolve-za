@@ -23,7 +23,10 @@ const teamFields = {
   longitude: coordinate(-180, 180),
 };
 
-export const teamCreateSchema = z.object(teamFields);
+export const teamCreateSchema = z.object({
+  ...teamFields,
+  isActive: z.boolean().optional(),
+});
 
 export const teamUpdateSchema = z
   .object({

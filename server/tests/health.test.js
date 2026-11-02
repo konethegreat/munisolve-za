@@ -50,4 +50,18 @@ describe('health and readiness', () => {
     assert.equal(res.body.checks.database, 'up');
     assert.equal(res.body.checks.migrations, 'pending');
   });
+
+  test('/ready gives up on a hung migrations query and still reports the database as up', async () => {
+    h.db.queryRawOverride = (strings) => {
+      const sql = strings.join('');
+      // The migrations table never answers, so only the 2 second bound can finish the check.
+      return sql.includes('_prisma_migrations') ? new Promise(() => {}) : [{ ok: 1 }];
+    };
+
+    const res = await h.api('GET', '/ready');
+
+    assert.equal(res.status, 503);
+    assert.equal(res.body.checks.database, 'up');
+    assert.equal(res.body.checks.migrations, 'unknown');
+  });
 });

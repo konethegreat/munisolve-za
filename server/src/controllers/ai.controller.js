@@ -115,6 +115,7 @@ const chat = async (req, res) => {
       success: false,
       message: 'Siyanda is unavailable right now. Your report can still be tracked here.',
       errorCode: 'AI_UNAVAILABLE',
+      requestId: req.id,
     });
   }
 
@@ -141,11 +142,13 @@ const chat = async (req, res) => {
   } catch (error) {
     // Only the model call has a fallback: the citizen still gets a human answer,
     // and no internal detail (or debug field) leaks to the caller.
-    logger.error({ err: error }, 'AI chat failed');
+    logger.error({ err: error, requestId: req.id }, 'AI chat failed');
 
     return res.status(500).json({
       success: false,
       message: 'Siyanda is unavailable right now. Please try again shortly.',
+      errorCode: 'AI_UNAVAILABLE',
+      requestId: req.id,
     });
   }
 

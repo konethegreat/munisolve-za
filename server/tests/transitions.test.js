@@ -152,4 +152,92 @@ describe('report transitions', () => {
     assert.equal(history(report.id).length, 0);
     assert.equal(actions(report.id).length, 0);
   });
+
+  test('two concurrent status changes cannot both be written', async () => {
+    // A citizen may only resolve, so an admin drives both canonical moves through the
+    // auth-only route. The status guard, not the matrix, has to stop the second write.
+    const report = h.makeReport(citizen, { status: 'PENDING' });
+
+    const [first, second] = await Promise.all([
+      h.api('PATCH', `/api/reports/${report.id}/status`, { token: as(admin), body: { status: 'RESOLVED' } }),
+      h.api('PATCH', `/api/reports/${report.id}/status`, { token: as(admin), body: { status: 'REJECTED' } }),
+    ]);
+
+    assert.deepEqual([first.status, second.status].sort((a, b) => a - b), [200, 409]);
+    const loser = first.status === 409 ? first : second;
+    assert.equal(loser.body.errorCode, 'INVALID_TRANSITION');
+
+    const winner = first.status === 200 ? 'RESOLVED' : 'REJECTED';
+    const rows = history(report.id);
+    assert.equal(rows.length, 1);
+    assert.deepEqual([rows[0].fromStatus, rows[0].toStatus], ['PENDING', winner]);
+    assert.equal(h.db.tables.report.find((row) => row.id === report.id).status, winner);
+  });
+
+  test('a status change that lost the race is refused instead of writing false history', async () => {
+    // Two HTTP requests against the fake client finish in order rather than interleaving, so the
+    // stale read is staged here: the service reads PENDING while the row already says IN_PROGRESS.
+    const { transitionReport } = require('../src/services/report.service');
+    const report = h.makeReport(citizen, { status: 'IN_PROGRESS' });
+
+    const realFindUnique = h.db.report.findUnique;
+    let stale = true;
+    h.db.report.findUnique = async (args) => {
+      const row = await realFindUnique(args);
+      if (stale && args.where?.id === report.id) {
+        stale = false;
+        return { ...row, status: 'PENDING' };
+      }
+      return row;
+    };
+
+    try {
+      await assert.rejects(
+        () => transitionReport({
+          reportId: report.id,
+          actor: { id: admin.id, role: 'MUNICIPAL_ADMIN' },
+          nextStatus: 'REJECTED',
+          source: 'admin',
+        }),
+        (error) => error.statusCode === 409
+          && error.errorCode === 'INVALID_TRANSITION'
+          && error.message === 'Report status changed. Refresh and try again.',
+      );
+    } finally {
+      h.db.report.findUnique = realFindUnique;
+    }
+
+    assert.equal(h.db.tables.report.find((row) => row.id === report.id).status, 'IN_PROGRESS');
+    assert.equal(history(report.id).length, 0);
+    assert.equal(actions(report.id).length, 0);
+  });
+
+  test('a rejected report sent back to PENDING counts as a reopen', async () => {
+    const report = h.makeReport(citizen, { status: 'REJECTED' });
+
+    const res = await h.api('PATCH', `/api/admin/reports/${report.id}/status`, {
+      token: as(admin),
+      body: { status: 'PENDING' },
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.status, 'PENDING');
+    assert.equal(res.body.data.reopenCount, 1);
+    assert.equal(h.db.tables.report.find((row) => row.id === report.id).reopenCount, 1);
+  });
+
+  test('a forced CLOSED to REJECTED clears resolvedAt', async () => {
+    const resolvedAt = new Date('2026-10-01T08:00:00.000Z');
+    const report = h.makeReport(citizen, { status: 'CLOSED', resolvedAt, closedAt: resolvedAt });
+
+    const res = await h.api('PATCH', `/api/admin/reports/${report.id}/status`, {
+      token: as(superAdmin),
+      body: { status: 'REJECTED', reason: 'Closed in error, rejected after audit' },
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.status, 'REJECTED');
+    assert.equal(res.body.data.resolvedAt, null);
+    assert.equal(h.db.tables.report.find((row) => row.id === report.id).resolvedAt, null);
+  });
 });

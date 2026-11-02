@@ -191,8 +191,15 @@ describe('report lifecycle', () => {
     });
   });
 
-  test('a supervisor can set ASSIGNED, IN_PROGRESS, RESOLVED, CLOSED or REJECTED, but not PENDING', async () => {
+  test('the status endpoint rejects ASSIGNED with 400 ASSIGNMENT_REQUIRED; ASSIGNED is reachable only through the assignment endpoint', async () => {
     const report = h.makeReport(alice, { status: 'IN_PROGRESS' });
+
+    const assigned = await h.api('PATCH', `/api/supervisor/reports/${report.id}/status`, {
+      token: as(supervisor),
+      body: { status: 'ASSIGNED' },
+    });
+    assert.equal(assigned.status, 400);
+    assert.equal(assigned.body.errorCode, 'ASSIGNMENT_REQUIRED');
 
     const res = await h.api('PATCH', `/api/supervisor/reports/${report.id}/status`, {
       token: as(supervisor),
@@ -273,5 +280,17 @@ describe('report lifecycle', () => {
       .filter((log) => log.entity === 'Team')
       .map((log) => log.action);
     assert.deepEqual(trail, ['TEAM_CREATED', 'TEAM_UPDATED', 'TEAM_UPDATED']);
+  });
+
+  test('a team can be created inactive for a crew that is not yet operational', async () => {
+    const created = await h.api('POST', '/api/supervisor/teams', {
+      token: as(supervisor),
+      body: { name: 'Standby Crew', specialization: 'Disaster Response', isActive: false },
+    });
+
+    assert.equal(created.status, 201);
+    assert.equal(created.body.data.isActive, false);
+    const stored = h.db.tables.team.find((team) => team.id === created.body.data.id);
+    assert.equal(stored.isActive, false);
   });
 });

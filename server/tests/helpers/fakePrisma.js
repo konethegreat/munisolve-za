@@ -253,6 +253,31 @@ function createFakePrisma() {
     return row;
   }
 
+  // Shared by update and updateMany: one data document applied to one row, with Prisma's
+  // numeric increment/decrement support.
+  function applyData(model, row, data) {
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) continue;
+      if (value && typeof value === 'object' && typeof value.increment === 'number') {
+        row[key] = (row[key] ?? 0) + value.increment;
+      } else if (value && typeof value === 'object' && typeof value.decrement === 'number') {
+        row[key] = (row[key] ?? 0) - value.decrement;
+      } else {
+        row[key] = value;
+      }
+    }
+    if (model === 'report') row.updatedAt = now();
+    return row;
+  }
+
+  // updateMany only filters on scalar fields. Relations in `where` are left to the caller,
+  // exactly as the single-row `update` above treats them.
+  function scalarWhere(model, where = {}) {
+    return Object.fromEntries(
+      Object.entries(where).filter(([key, condition]) => condition !== undefined && !RELATIONS[model][key]),
+    );
+  }
+
   function delegate(model) {
     return {
       async findUnique({ where, ...projection }) {
@@ -275,18 +300,16 @@ function createFakePrisma() {
       },
       async update({ where, data, ...projection }) {
         const row = requireOne(model, where);
-        for (const [key, value] of Object.entries(data)) {
-          if (value === undefined) continue;
-          if (value && typeof value === 'object' && typeof value.increment === 'number') {
-            row[key] = (row[key] ?? 0) + value.increment;
-          } else if (value && typeof value === 'object' && typeof value.decrement === 'number') {
-            row[key] = (row[key] ?? 0) - value.decrement;
-          } else {
-            row[key] = value;
-          }
-        }
-        if (model === 'report') row.updatedAt = now();
+        applyData(model, row, data);
         return project(model, row, projection);
+      },
+      // Conditional bulk write: every row whose scalar fields equal the filter values is updated
+      // and counted, so a service can write "only if the status is still what I read".
+      async updateMany({ where, data } = {}) {
+        const condition = scalarWhere(model, where);
+        const rows = tables[model].filter((row) => matches(row, condition));
+        for (const row of rows) applyData(model, row, data || {});
+        return { count: rows.length };
       },
       async delete({ where }) {
         const row = requireOne(model, where);

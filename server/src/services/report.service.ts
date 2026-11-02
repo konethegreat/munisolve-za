@@ -1,6 +1,6 @@
 import prisma from '../config/db.config';
 import { AppError } from '../errors/AppError';
-import { canTransition } from '../domain/reportStateMachine';
+import { ALLOWED_TRANSITIONS, canTransition } from '../domain/reportStateMachine';
 import type { ReportStatus, Role } from '../domain/reportStateMachine';
 
 export type TransitionSource = 'reports' | 'supervisor' | 'admin';
@@ -43,6 +43,20 @@ const reportInclude = {
   user: { select: { id: true, firstName: true, lastName: true, email: true } },
   team: { select: { id: true, name: true, specialization: true } },
 };
+
+// Assignment is its own route, so the current statuses that may be assigned are the ones the
+// matrix lets reach ASSIGNED. Deriving them keeps this guard in step with the state machine.
+const ASSIGNABLE_STATUSES: readonly string[] = (Object.keys(ALLOWED_TRANSITIONS) as ReportStatus[]).filter(
+  (status) => ALLOWED_TRANSITIONS[status].includes('ASSIGNED'),
+);
+
+// A move back to PENDING or IN_PROGRESS from any finished state is a reopen, including a
+// rejected report that is sent back to triage.
+const REOPEN_SOURCES: readonly string[] = ['RESOLVED', 'CLOSED', 'REJECTED'];
+
+// Two requests can read the same status and both pass the matrix, so the write is conditional on
+// the status that was read. A lost race becomes a 409 instead of a false "from" history row.
+const STALE_STATUS_MESSAGE = 'Report status changed. Refresh and try again.';
 
 function transitionDescription(source: TransitionSource, reportId: number, from: string, to: string, note?: string): string {
   if (source === 'supervisor') {
@@ -104,20 +118,26 @@ export async function transitionReport(options: TransitionOptions) {
     } else if (options.nextStatus === 'PENDING' || options.nextStatus === 'IN_PROGRESS') {
       data.resolvedAt = null;
       data.closedAt = null;
+    } else if (options.nextStatus === 'REJECTED') {
+      data.resolvedAt = null;
     }
 
     if (
       (options.nextStatus === 'PENDING' || options.nextStatus === 'IN_PROGRESS') &&
-      (report.status === 'RESOLVED' || report.status === 'CLOSED')
+      REOPEN_SOURCES.includes(report.status)
     ) {
       data.reopenCount = { increment: 1 };
     }
 
-    const updated = await tx.report.update({
-      where: { id: report.id },
+    const guard = await tx.report.updateMany({
+      where: { id: report.id, status: report.status },
       data,
-      include: reportInclude,
     });
+    if (guard.count !== 1) {
+      throw new AppError(409, 'INVALID_TRANSITION', STALE_STATUS_MESSAGE);
+    }
+
+    const updated = await tx.report.findUnique({ where: { id: report.id }, include: reportInclude });
 
     await tx.reportStatusHistory.create({
       data: {
@@ -162,19 +182,23 @@ export async function assignReport(options: AssignOptions) {
     if (!team) throw new AppError(404, 'TEAM_NOT_FOUND', 'Team not found.');
     if (!team.isActive) throw new AppError(400, 'INACTIVE_TEAM', 'Cannot assign to an inactive team.');
 
-    if (!['PENDING', 'ASSIGNED'].includes(report.status)) {
+    if (!ASSIGNABLE_STATUSES.includes(report.status)) {
       throw new AppError(409, 'INVALID_TRANSITION', `Cannot assign a report with status ${report.status}.`);
     }
 
-    const updated = await tx.report.update({
-      where: { id: report.id },
+    const guard = await tx.report.updateMany({
+      where: { id: report.id, status: report.status },
       data: {
         status: 'ASSIGNED',
         assignedTeamId: options.teamId,
         assignedAt: new Date(),
       },
-      include: reportInclude,
     });
+    if (guard.count !== 1) {
+      throw new AppError(409, 'INVALID_TRANSITION', STALE_STATUS_MESSAGE);
+    }
+
+    const updated = await tx.report.findUnique({ where: { id: report.id }, include: reportInclude });
 
     await tx.reportStatusHistory.create({
       data: {
