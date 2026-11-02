@@ -63,39 +63,31 @@ munisolve-za/
 │   ├── vite.config.js
 │   └── vercel.json                   # SPA rewrite rules for Vercel
 │
-└── server/                   # Express.js backend
+└── server/                   # Express.js backend (TypeScript)
     ├── prisma/
-    │   └── schema.prisma             # Single source of truth for DB schema
+    │   ├── schema.prisma             # Single source of truth for DB schema
+    │   ├── migrations/               # Immutable versioned migrations
+    │   ├── seedAdmin.ts              # Creates/resets one MUNICIPAL_ADMIN
+    │   └── seedDemo.ts               # Synthetic local demo data (local only)
+    ├── scripts/
+    │   ├── demo.ts                   # Disposable Docker demo launcher (tsx)
+    │   ├── start-demo-server.ts      # Demo API entry (tsx)
+    │   └── verify-workflow.ts        # Real PostgreSQL HTTP workflow check
     └── src/
         ├── config/
-        │   └── db.config.js          # Prisma client singleton
-        ├── controllers/
-        │   ├── auth.controller.js
-        │   ├── report.controller.js
-        │   ├── ai.controller.js
-        │   ├── admin.controller.js
-        │   ├── supervisor.controller.js
-        │   └── public.controller.js
-        ├── middleware/
-        │   ├── auth.middleware.js             # JWT verify → sets req.user
-        │   ├── authz.middleware.js            # Role checks
-        │   ├── requireAdmin.middleware.js     # MUNICIPAL_ADMIN | SUPER_ADMIN
-        │   ├── requireSupervisor.middleware.js# WORKER_SUPERVISOR | MUNICIPAL_ADMIN | SUPER_ADMIN
-        │   ├── rateLimit.middleware.js        # All rate limiters
-        │   ├── security.config.js
-        │   └── validation.middleware.js
-        ├── routes/
-        │   ├── auth.routes.js
-        │   ├── report.routes.js
-        │   ├── ai.routes.js
-        │   ├── admin.routes.js
-        │   ├── supervisor.routes.js
-        │   ├── public.routes.js
-        │   └── user.routes.js
-        ├── services/
-        │   ├── weather.service.js    # Called at report submission time
-        │   └── email.service.js      # Resend — sends branded OTP verification emails
-        └── server.js                 # Entry point — middleware wiring, route mounting
+        │   ├── db.config.ts          # Prisma client singleton (+ retry wrapper)
+        │   └── retry.ts              # Bounded retry for transient DB errors
+        ├── controllers/              # .ts route handlers; docs/health/tick/webhook/duplicate already TS
+        ├── domain/                   # Pure report state machine
+        ├── errors/AppError.ts
+        ├── logger.ts                 # Pino logger (silent under NODE_ENV=test)
+        ├── middleware/               # auth, authz, role guards, rate limits, validate, ids, errors
+        ├── openapi/                  # API description
+        ├── routes/                   # .ts routers; export = router for require() consumers
+        ├── schemas/                  # Zod request contracts
+        ├── services/                 # SLA, outbox, duplicate, webhook, weather, geo, email
+        ├── types/express.d.ts        # Request augmentation (id, validated, user, token)
+        └── server.ts                 # Entry point — middleware wiring, route mounting
 ```
 
 ---
@@ -371,10 +363,10 @@ cd server
 npm ci --include=dev        # install dependencies, including build tooling
 npx prisma generate         # generate the Prisma client
 npx prisma migrate deploy   # apply the versioned migrations
-npm run typecheck           # tsc --noEmit
+npm run typecheck           # tsc --noEmit (src + prisma/scripts via tsconfig.tools.json)
 npm test                    # node --test with tsx
 npm run build               # tsc → dist/server.js
-npm run dev                 # tsx watch src/server.js
+npm run dev                 # tsx watch src/server.ts
 npm run demo:verify         # disposable PostgreSQL 16 HTTP workflow
 npx prisma studio           # visual DB browser
 
@@ -408,7 +400,9 @@ npx prisma migrate resolve --applied 20261102000000_baseline
 
 ## Key Patterns & Gotchas
 
-- **Prisma client** is a singleton in `server/src/config/db.config.js` — always import from there, never instantiate a new `PrismaClient`.
+- **Prisma client** is a singleton in `server/src/config/db.config.ts` — always import from there, never instantiate a new `PrismaClient`.
+- **TypeScript** — all server source, seeds and scripts are TypeScript. Modules that are consumed through `require()` (`db.config`, routers, `server.ts`) use `export =`; modules consumed with named imports use named exports. Tests and scripts run through `tsx`, so extensionless imports resolve `.ts`. `npm run typecheck` covers `src` plus `prisma`/`scripts` through `tsconfig.tools.json`, while `npm run build` emits only `src` to `dist`.
+- **Operations** — deploy, rollback, backup/restore and incident guidance live in `docs/OPERATIONS.md`. `.github/workflows/keep-api-awake.yml` pings `/health` every 10 minutes; `.github/workflows/sla-tick.yml` runs the hourly SLA/outbox tick.
 - **Schema changes** — add a versioned migration in `server/prisma/migrations`; production, CI and `demo:verify` use `prisma migrate deploy`. Do not use `prisma db push` against a database whose migration history matters.
 - **Roles** — the actual role strings are `CITIZEN`, `MUNICIPAL_ADMIN`, `SUPER_ADMIN`, `WORKER_SUPERVISOR`. The old CLAUDE.md incorrectly said `ADMIN`/`SUPERADMIN` — those are wrong.
 - **Google OAuth** — uses explicit `findUnique` + `update/create` instead of `upsert`. The upsert caused Prisma "invalid invocation" errors due to dual unique fields (`email` + `googleId`). Do not revert to upsert.

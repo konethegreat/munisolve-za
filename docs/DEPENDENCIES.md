@@ -9,11 +9,11 @@ full dependency audits to zero findings.
 
 - Node.js 22.12 or later is declared in both manifests, matching the documented
   runtime and the Node 22 CI jobs.
-- `npm run dev` in the server uses `node --watch src/server.js`. Removing nodemon
+- `npm run dev` in the server uses `tsx watch src/server.ts`. Removing nodemon
   removes its chokidar/braces dependency chain. The [braces advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
-  lists no patched version. [Node watch mode](https://nodejs.org/api/cli.html#--watch)
-  restarts the process when the entry point or imported modules change; restart
-  manually after editing environment variables or the Prisma schema.
+  lists no patched version. `tsx watch` restarts the process when imported
+  modules change; restart manually after editing environment variables or the
+  Prisma schema.
 - Prisma CLI and client remain on version 6, with a minimum of 6.19.3. The
   application continues to use its existing Prisma client and `prisma db push`.
 - A scoped npm override selects `deepmerge-ts` 8.0.2 only under `@prisma/config`.
