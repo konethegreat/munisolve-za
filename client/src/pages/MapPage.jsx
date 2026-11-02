@@ -3,10 +3,12 @@
 // ==========================================
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { SlidersHorizontal, X } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import api from '../api/axios';
+import { normalizeApiError } from '../api/errors';
 import Navbar from '../components/Navbar';
 import {
   SOUTH_AFRICA_CENTER,
@@ -114,6 +116,7 @@ export default function MapPage() {
   const [statusFilter, setStatusFilter] = useState(['ALL']);
   const [categoryFilter, setCategoryFilter] = useState([]);
   const [viewMode, setViewMode] = useState('pins'); // 'pins' | 'heatmap'
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     fetchReports();
@@ -128,8 +131,7 @@ export default function MapPage() {
         setReports(data.data);
       }
     } catch (err) {
-      setError('Failed to load reports. Please refresh.');
-      console.error('Failed to fetch reports:', err);
+      setError(normalizeApiError(err, 'Failed to load reports. Please refresh.').message);
     } finally {
       setLoading(false);
     }
@@ -197,16 +199,40 @@ export default function MapPage() {
     setCategoryFilter([]);
   };
 
+  const activeFilterCount =
+    (statusFilter.includes('ALL') ? 0 : statusFilter.length) + categoryFilter.length;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <Navbar />
-      <div className="flex-1 flex overflow-hidden min-h-0" style={{ height: 'calc(100vh - 4rem)' }}>
-        {/* Filter panel - left sidebar 280px */}
-        <aside className="w-[280px] flex-shrink-0 bg-white border-r border-slate-200 shadow-sm flex flex-col overflow-hidden">
-          <div className="p-5 border-b border-slate-100">
+      <div className="relative flex flex-1 overflow-hidden" style={{ height: 'calc(100dvh - 4rem)' }}>
+        {filtersOpen && (
+          <button
+            type="button"
+            aria-label="Close filters"
+            onClick={() => setFiltersOpen(false)}
+            className="fixed inset-x-0 bottom-0 top-16 z-[999] bg-slate-900/40 lg:hidden"
+          />
+        )}
+
+        {/* Filter panel: drawer on mobile, fixed sidebar from large screens */}
+        <aside
+          className={`fixed bottom-0 left-0 top-16 z-[1000] flex w-[280px] flex-shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white shadow-lg transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 lg:shadow-sm ${
+            filtersOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="flex items-center justify-between border-b border-slate-100 p-5">
             <h1 className="text-xl font-bold text-[#0d3b5c]">Incident Map</h1>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(false)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden"
+              aria-label="Close filters"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <div className="p-4 space-y-6 overflow-y-auto">
+          <div className="flex-1 space-y-6 overflow-y-auto p-4">
             {error && (
               <p className="text-red-500 text-sm">{error}</p>
             )}
@@ -260,8 +286,21 @@ export default function MapPage() {
         {/* Map area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Layer toggle above map */}
-          <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-100 shadow-sm">
-            <span className="text-sm font-medium text-slate-600 mr-2">View:</span>
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-white px-4 py-2 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:hidden"
+            >
+              <SlidersHorizontal size={15} />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-[#0d3b5c] px-1.5 py-0.5 text-xs font-semibold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <span className="mr-2 hidden text-sm font-medium text-slate-600 sm:inline">View:</span>
             <button
               type="button"
               onClick={() => setViewMode('pins')}
@@ -284,6 +323,18 @@ export default function MapPage() {
             >
               Heatmap
             </button>
+            <span className="ml-auto text-xs text-slate-400">
+              {reportsWithCoords.length} on map
+            </span>
+            {error && (
+              <button
+                type="button"
+                onClick={fetchReports}
+                className="text-xs font-medium text-red-600 underline hover:text-red-700"
+              >
+                {error} Retry
+              </button>
+            )}
           </div>
 
           <div className="flex-1 relative min-h-0">

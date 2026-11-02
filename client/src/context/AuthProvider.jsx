@@ -55,6 +55,17 @@ export function AuthProvider({ children }) {
     loadUser();
   }, []);
 
+  // The API client emits this when a token is rejected, so every consumer drops to a signed-out
+  // state without each page having to handle 401 itself.
+  useEffect(() => {
+    const handleExpired = () => {
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener('munisolve:auth-expired', handleExpired);
+    return () => window.removeEventListener('munisolve:auth-expired', handleExpired);
+  }, []);
+
   // Login function
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });

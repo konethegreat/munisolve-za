@@ -2,7 +2,6 @@
 // APP.JSX (Updated with Auth & Protected Routes)
 // ==========================================
 import { Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import SupervisorRoute from './components/SupervisorRoute';
@@ -22,7 +21,7 @@ import VerifyEmail from './pages/VerifyEmail';
 
 function App() {
   return (
-    <AuthProvider>
+    <>
       {import.meta.env.VITE_DEMO_MODE === 'true' && (
         <div role="status" className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
           Local demo · fictional data · no real municipal submissions
@@ -79,7 +78,7 @@ function App() {
           }
         />
       </Routes>
-    </AuthProvider>
+    </>
   );
 }
 

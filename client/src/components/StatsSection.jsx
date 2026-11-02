@@ -39,7 +39,7 @@ export default function StatsSection() {
   const maxCat = stats?.categories?.[0]?.count || 1;
 
   return (
-    <section className="bg-mesh py-16 sm:py-20">
+    <section id="impact" className="scroll-mt-20 bg-mesh py-16 sm:py-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
           <span className="inline-flex items-center gap-2 text-sm font-medium text-[#1a5f3c]">

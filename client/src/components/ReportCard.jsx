@@ -3,10 +3,15 @@
 // ==========================================
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GitMerge } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
 import api from '../api/axios';
+import { normalizeApiError } from '../api/errors';
 import SiyandaChat from './SiyandaChat';
 import WeatherBadge from './WeatherBadge';
+import StatusBadge from './StatusBadge';
+import SlaBadge from './SlaBadge';
 
 function categoryIcon(category) {
   const icons = {
@@ -18,33 +23,10 @@ function categoryIcon(category) {
   return icons[category] || '📋';
 }
 
-function StatusBadge({ status }) {
-  const styles = {
-    PENDING:     'bg-yellow-100 text-yellow-800 border border-yellow-200',
-    ASSIGNED:    'bg-indigo-100 text-indigo-800 border border-indigo-200',
-    IN_PROGRESS: 'bg-blue-100 text-blue-800 border border-blue-200',
-    RESOLVED:    'bg-green-100 text-green-800 border border-green-200',
-    REJECTED:    'bg-red-100 text-red-800 border border-red-200',
-    CLOSED:      'bg-slate-100 text-slate-700 border border-slate-200',
-  };
-  const labels = {
-    PENDING:     '⏳ Pending',
-    ASSIGNED:    '👷 Assigned',
-    IN_PROGRESS: '🔧 In Progress',
-    RESOLVED:    '✅ Resolved',
-    REJECTED:    '❌ Rejected',
-    CLOSED:      '✓ Closed',
-  };
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status] || styles.PENDING}`}>
-      {labels[status] || status}
-    </span>
-  );
-}
-
 export default function ReportCard({ report: initialReport, onDelete }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
   const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
   const [markingResolved, setMarkingResolved] = useState(false);
@@ -53,13 +35,14 @@ export default function ReportCard({ report: initialReport, onDelete }) {
   const reference = `#${String(report.id).padStart(4, '0')}`;
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this report?')) return;
+    if (!confirm('Delete this report? This cannot be undone.')) return;
     setDeleting(true);
     try {
       await api.delete(`/reports/${report.id}`);
+      toast.success('Report deleted.');
       onDelete(report.id);
-    } catch {
-      alert('Failed to delete report. Please try again.');
+    } catch (err) {
+      toast.error(normalizeApiError(err, 'Failed to delete report.'));
     } finally {
       setDeleting(false);
     }
@@ -70,9 +53,12 @@ export default function ReportCard({ report: initialReport, onDelete }) {
     setMarkingResolved(true);
     try {
       const { data } = await api.patch(`/reports/${report.id}/status`, { status: 'RESOLVED' });
-      if (data.success) setReport(data.data);
+      if (data.success) {
+        setReport(data.data);
+        toast.success('Thanks for confirming. This report is now marked as resolved.');
+      }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update status');
+      toast.error(normalizeApiError(err, 'Failed to update status.'));
     } finally {
       setMarkingResolved(false);
     }
@@ -82,9 +68,12 @@ export default function ReportCard({ report: initialReport, onDelete }) {
   const handleAdminStatus = async (newStatus) => {
     try {
       const { data } = await api.patch(`/reports/${report.id}/status`, { status: newStatus });
-      if (data.success) setReport(data.data);
+      if (data.success) {
+        setReport(data.data);
+        toast.success(`Report moved to ${newStatus.replace(/_/g, ' ').toLowerCase()}.`);
+      }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update status');
+      toast.error(normalizeApiError(err, 'Failed to update status.'));
     }
   };
 
@@ -110,11 +99,24 @@ export default function ReportCard({ report: initialReport, onDelete }) {
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <StatusBadge status={report.status} />
+            <SlaBadge report={report} />
             <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
               {report.category.replace(/_/g, ' ')}
             </span>
           </div>
         </div>
+
+        {report.duplicateOfId && (
+          <button
+            type="button"
+            onClick={() => navigate(`/reports/${report.duplicateOfId}`)}
+            className="mt-3 flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs text-slate-600 transition-colors hover:border-[#0d3b5c]/30 hover:text-[#0d3b5c]"
+          >
+            <GitMerge size={13} />
+            Merged into report #{String(report.duplicateOfId).padStart(4, '0')}. Open the main
+            report for updates.
+          </button>
+        )}
 
         <WeatherBadge 
           weatherCondition={report.weatherCondition}
