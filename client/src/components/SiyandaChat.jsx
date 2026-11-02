@@ -123,8 +123,8 @@ export default function SiyandaChat({ report, initialMessage }) {
     setLoading(true);
 
     try {
-      // Build history (exclude timestamps for API)
-      const history = messages.map(({ role, content }) => ({ role, content }));
+      // The API rejects history longer than 20 entries, so keep only the most recent.
+      const history = messages.slice(-20).map(({ role, content }) => ({ role, content }));
 
       const { data } = await api.post('/ai/chat', {
         reportId: report.id,
