@@ -20,7 +20,7 @@
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seedAdmin.js",
-    "db:seed:demo": "node prisma/seedDemo.js"
+    "db:seed:demo": "tsx prisma/seedDemo.js"
   },
   "keywords": [],
   "author": "",

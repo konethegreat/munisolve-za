@@ -61,7 +61,7 @@ const DEFAULTS = {
     reopenCount: 0,
   }),
   team: () => ({ municipality: null, latitude: null, longitude: null, isActive: true }),
-  activityLog: () => ({ description: null, ipAddress: null, userAgent: null }),
+  activityLog: () => ({ description: null, ipAddress: null, userAgent: null, requestId: null }),
   reportStatusHistory: () => ({
     fromStatus: null,
     actorId: null,

@@ -95,7 +95,7 @@ async function main() {
     '--to-schema-datamodel', 'prisma/schema.prisma',
     '--exit-code',
   ], { stdio: 'inherit' });
-  await run(process.execPath, ['prisma/seedDemo.js'], { stdio: 'inherit' });
+  await run(process.execPath, ['--import', 'tsx', 'prisma/seedDemo.js'], { stdio: 'inherit' });
   env.PORT = String(await availablePort());
   env.CLIENT_URL = `http://127.0.0.1:${await availablePort()}`;
   const api = launch(process.execPath, ['--import', 'tsx', 'scripts/start-demo-server.js'], { stdio: 'inherit' });

@@ -38,6 +38,7 @@ describe('reports', () => {
       const res = await h.api('POST', '/api/reports', {
         token: as(alice),
         body: { ...body, userId: bob.id, status: 'RESOLVED', assignedTeamId: 1, afterPhotoUrl: 'https://example.com/x.jpg' },
+        headers: { 'x-request-id': 'test-request-1234' },
       });
 
       assert.equal(res.status, 201);
@@ -48,6 +49,8 @@ describe('reports', () => {
       assert.ok(!('password' in res.body.data.user));
       assert.equal(reportRow(res.body.data.id).userId, alice.id);
       assert.equal(logsFor('CREATE_REPORT').length, 1);
+      // The audit row is correlated with the request that created the report.
+      assert.equal(logsFor('CREATE_REPORT')[0].requestId, 'test-request-1234');
     });
 
     test('adds the assistant acknowledgement, and a fallback message when the AI is down', async () => {

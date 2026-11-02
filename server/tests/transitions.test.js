@@ -33,12 +33,20 @@ describe('report transitions', () => {
     const res = await h.api('PATCH', `/api/reports/${report.id}/status`, {
       token: as(citizen),
       body: { status: 'RESOLVED', note: 'Fixed, thanks' },
+      headers: { 'x-request-id': 'test-request-1234' },
     });
 
     assert.equal(res.status, 200);
     assert.equal(res.body.data.status, 'RESOLVED');
     assert.deepEqual(history(report.id).map((row) => [row.fromStatus, row.toStatus]), [['PENDING', 'RESOLVED']]);
     assert.deepEqual(actions(report.id), ['UPDATE_STATUS']);
+
+    // The audit row is correlated with the inbound request and carries the caller's origin.
+    const activity = h.db.tables.activityLog.find((log) => log.action === 'UPDATE_STATUS');
+    assert.equal(activity.requestId, 'test-request-1234');
+    assert.equal(typeof activity.ipAddress, 'string');
+    assert.ok(activity.ipAddress.length > 0);
+    assert.notEqual(activity.userAgent, undefined);
   });
 
   test('a supervisor uses the same service and history, with REPORT_STATUS_CHANGED', async () => {
