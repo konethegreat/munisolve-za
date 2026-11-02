@@ -115,7 +115,7 @@ console for the current plan before relying on it.
 | Symptom | Likely cause | Action |
 |---|---|---|
 | `POST /api/internal/tick` returns 401 | `TICK_SECRET` differs between GitHub and Render | Re-copy the secret in both places |
-| Tick returns `sent: 0, failed: N` | Resend key or verified sender domain is missing/invalid | Check `RESEND_API_KEY` and `RESEND_FROM_EMAIL`; inspect `NotificationOutbox.lastError`; rows with no email config are marked `SKIPPED`, not retried |
+| Tick returns `sent: 0, failed: N` | Resend key or verified sender domain is missing/invalid | Check `RESEND_API_KEY` and `RESEND_FROM_EMAIL`; inspect `NotificationOutbox.lastError`, which now carries the provider status and message. A `@resend.dev` sender is Resend's sandbox and only delivers to the Resend account owner's address; verify `munisolve.co.za` in Resend and set `RESEND_FROM_EMAIL` to that domain before real recipients are expected. Rows with no email config are marked `SKIPPED`, not retried |
 | AI chat returns 503 `AI_UNAVAILABLE` | No/invalid `ANTHROPIC_API_KEY` or provider outage | Reports still work; restore the key or wait |
 | `/ready` is 503 while `/health` is 200 | Neon suspended, waking, or migration drift | Retry; then check the Neon console and `prisma migrate status` |
 | Login or register returns 429 | Auth rate limit (5 attempts / 15 min / IP) | Wait, or clear the limit by restarting the instance; do not raise limits for convenience |

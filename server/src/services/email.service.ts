@@ -17,6 +17,18 @@ const escapeHtml = (value: unknown) =>
 
 export const isEmailConfigured = () => Boolean(resend);
 
+interface EmailProviderError {
+  statusCode?: number | null;
+  message?: string;
+}
+
+// Keep the provider's reason on the thrown error: the outbox stores it as
+// lastError, which is the only diagnostic available after a scheduled run.
+const emailFailure = (action: string, error: EmailProviderError) => {
+  const detail = [error.statusCode, error.message].filter(Boolean).join(' ');
+  return new Error(detail ? `${action}: ${detail}` : action);
+};
+
 export const sendVerificationEmail = async (toEmail: string, firstName: string, otp: string) => {
   if (!resend) throw new Error('Email delivery is not configured.');
   const { error } = await resend.emails.send({
@@ -71,7 +83,7 @@ export const sendVerificationEmail = async (toEmail: string, firstName: string, 
 
   if (error) {
     logger.error({ err: error }, 'Verification email failed');
-    throw new Error('Failed to send verification email.');
+    throw emailFailure('Failed to send verification email.', error);
   }
 };
 
@@ -123,6 +135,6 @@ export const sendNotificationEmail = async ({ to, subject, text }: NotificationE
 
   if (error) {
     logger.error({ err: error }, 'Notification email failed');
-    throw new Error('Failed to send notification email.');
+    throw emailFailure('Failed to send notification email.', error);
   }
 };
