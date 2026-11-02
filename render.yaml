@@ -10,3 +10,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: TICK_SECRET
+        sync: false

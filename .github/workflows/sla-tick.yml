@@ -1,0 +1,29 @@
+name: SLA tick
+
+on:
+  schedule:
+    - cron: '5 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: sla-tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the tick endpoint
+        env:
+          API_URL: ${{ secrets.MUNISOLVE_API_URL }}
+          TICK_SECRET: ${{ secrets.TICK_SECRET }}
+        run: |
+          if [ -z "$API_URL" ] || [ -z "$TICK_SECRET" ]; then
+            echo "::error::MUNISOLVE_API_URL and TICK_SECRET repository secrets are required."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --retry 2 --retry-delay 5 \
+            --max-time 180 -X POST "${API_URL%/}/api/internal/tick" \
+            -H "x-tick-secret: $TICK_SECRET"

@@ -3,14 +3,14 @@
 // Real HTTP handlers + Prisma + PostgreSQL. No signed-token or database stubs.
 const assert = require('node:assert/strict');
 
-async function verifyWorkflow(baseURL, password) {
+async function verifyWorkflow(baseURL, password, tickSecret) {
   const target = new URL(baseURL);
   assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname), 'Workflow verification is local only.');
   const steps = [];
-  async function request(label, method, route, status, token, body) {
+  async function request(label, method, route, status, token, body, extraHeaders = {}) {
     const response = await fetch(baseURL + route, {
       method, signal: AbortSignal.timeout(15_000),
-      headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+      headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }), ...extraHeaders },
       ...(body && { body: JSON.stringify(body) }),
     });
     assert.equal(response.status, status, `${label}: ${method} ${route}`);
@@ -92,6 +92,12 @@ async function verifyWorkflow(baseURL, password) {
   const dashboard = await request('Admin dashboard reflects five fictional reports', 'GET', '/admin/dashboard', 200, tokens.admin);
   assert.equal(dashboard.data.reports.total, 5);
   assert.equal(dashboard.data.users.total, 4);
+  await request('Tick rejects an anonymous call', 'POST', '/internal/tick', 401);
+  const tick = await request('Tick runs with the scheduler secret', 'POST', '/internal/tick', 200, null, undefined, {
+    'x-tick-secret': tickSecret,
+  });
+  assert.equal(tick.data.enqueued, 0);
+  assert.equal(tick.data.sent, 0);
   console.log(JSON.stringify({ result: 'passed', database: 'disposable PostgreSQL 16', steps,
     lifecycle: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'],
     limitations: ['No real municipal submission', 'No AI, email, Google OAuth or weather provider verification',
