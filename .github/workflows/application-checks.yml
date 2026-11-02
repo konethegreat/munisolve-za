@@ -77,4 +77,5 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=low
       - run: npm run lint
+      - run: npm test
       - run: npm run build

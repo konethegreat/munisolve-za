@@ -2,12 +2,18 @@
 // REPORT DETAIL PAGE
 // ==========================================
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { CalendarClock, GitMerge } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
 import api from '../api/axios';
+import { normalizeApiError } from '../api/errors';
+import { formatDueDate } from '../utils/sla';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SiyandaChat from '../components/SiyandaChat';
+import SlaBadge from '../components/SlaBadge';
+import DuplicatePrompt from '../components/DuplicatePrompt';
 
 // ==========================================
 // STATUS TIMELINE
@@ -84,6 +90,7 @@ function StatusTimeline({ status }) {
 function StatusActions({ report, onStatusUpdate, userRole }) {
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState('');
+  const toast = useToast();
   const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(userRole);
 
   const handleUpdate = async (newStatus) => {
@@ -96,9 +103,10 @@ function StatusActions({ report, onStatusUpdate, userRole }) {
       if (data.success) {
         onStatusUpdate(data.data);
         setNote('');
+        toast.success('Report status updated.');
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update status');
+      toast.error(normalizeApiError(err, 'Failed to update status.'));
     } finally {
       setLoading(false);
     }
@@ -216,28 +224,38 @@ export default function ReportDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-  const fetchReport = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get(`/reports/${id}`);
-      if (data.success) setReport(data.data);
-    } catch {
-      setError('Report not found or you do not have permission to view it.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchReport = async () => {
+      try {
+        setLoading(true);
+        const { data } = await api.get(`/reports/${id}`);
+        if (data.success) setReport(data.data);
+      } catch (err) {
+        const apiError = normalizeApiError(
+          err,
+          'Report not found or you do not have permission to view it.',
+        );
+        setError(apiError.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchReport();
-}, [id]); // Now 'fetchReport' isn't a dependency because it's local to the effect
+    fetchReport();
+  }, [id]);
 
   const handleStatusUpdate = (updatedReport) => {
     setReport(updatedReport);
+  };
+
+  const handleMerged = (mergedReport) => {
+    if (mergedReport) setReport((current) => ({ ...current, ...mergedReport }));
+    toast.info('This report is now linked to the main report.');
   };
 
   if (loading) {
@@ -308,17 +326,71 @@ export default function ReportDetail() {
             </div>
           </div>
 
+          {/* Merged notice */}
+          {report.duplicateOfId && (
+            <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <GitMerge size={18} className="mt-0.5 shrink-0 text-blue-600" />
+              <p className="text-sm text-blue-900">
+                This report was merged into{' '}
+                <Link
+                  to={`/reports/${report.duplicateOfId}`}
+                  className="font-semibold underline hover:text-blue-700"
+                >
+                  report #{String(report.duplicateOfId).padStart(4, '0')}
+                </Link>
+                . Follow the main report for progress and repairs.
+              </p>
+            </div>
+          )}
+
           {/* Status Timeline */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <h2 className="font-semibold text-slate-800 mb-6">Progress</h2>
             <StatusTimeline status={report.status} />
           </div>
 
+          {/* Service standard */}
+          {(report.responseDueAt || report.resolutionDueAt) && (
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 font-semibold text-slate-800">
+                  <CalendarClock size={17} className="text-[#0d3b5c]" />
+                  Service standard
+                </h2>
+                <SlaBadge report={report} />
+              </div>
+              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                {report.responseDueAt && (
+                  <div>
+                    <p className="text-slate-400">Response target</p>
+                    <p className="font-medium text-slate-700">{formatDueDate(report.responseDueAt)}</p>
+                  </div>
+                )}
+                {report.resolutionDueAt && (
+                  <div>
+                    <p className="text-slate-400">Resolution target</p>
+                    <p className="font-medium text-slate-700">{formatDueDate(report.resolutionDueAt)}</p>
+                  </div>
+                )}
+              </div>
+              <p className="mt-3 text-xs text-slate-400">
+                Targets come from the municipality. A re-opened report starts a new resolution
+                window.
+              </p>
+            </div>
+          )}
+
           {/* Status Actions */}
           <StatusActions
             report={report}
             onStatusUpdate={handleStatusUpdate}
             userRole={user?.role}
+          />
+
+          <DuplicatePrompt
+            reportId={report.id}
+            autoFetch={!report.duplicateOfId}
+            onMerged={handleMerged}
           />
 
           {/* Report Details */}

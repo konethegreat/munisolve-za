@@ -17,8 +17,12 @@ import {
   Zap,
 } from 'lucide-react';
 import api from '../api/axios';
+import { normalizeApiError } from '../api/errors';
+import { useToast } from '../context/ToastContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import StatusBadge from '../components/StatusBadge';
+import SlaBadge from '../components/SlaBadge';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -47,15 +51,6 @@ const STATUS_META = {
   REJECTED:    { label: 'Rejected',    bg: 'bg-red-100',     text: 'text-red-800' },
 };
 
-function StatusBadge({ status }) {
-  const m = STATUS_META[status] ?? STATUS_META.PENDING;
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${m.bg} ${m.text}`}>
-      {m.label}
-    </span>
-  );
-}
-
 const NEXT_STATUS_OPTIONS = {
   ASSIGNED:    ['IN_PROGRESS', 'REJECTED'],
   IN_PROGRESS: ['RESOLVED', 'REJECTED'],
@@ -74,6 +69,7 @@ const SPECIALIZATIONS = [
 // ─── Assign Modal ─────────────────────────────────────────────────────────────
 
 function AssignModal({ report, onClose, onAssigned }) {
+  const toast = useToast();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -98,21 +94,24 @@ function AssignModal({ report, onClose, onAssigned }) {
         note,
       });
       if (data.success) {
+        toast.success(`${selectedTeam.name} assigned to this report.`);
         onAssigned(data.data);
         onClose();
       } else {
         setError(data.message || 'Assignment failed.');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Assignment failed.');
+      const apiError = normalizeApiError(err, 'Assignment failed.');
+      setError(apiError.message);
+      toast.error(apiError);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
@@ -209,6 +208,7 @@ function AssignModal({ report, onClose, onAssigned }) {
 // ─── Status Update Modal ──────────────────────────────────────────────────────
 
 function StatusModal({ report, onClose, onUpdated }) {
+  const toast = useToast();
   const options = NEXT_STATUS_OPTIONS[report.status] ?? [];
   const [status, setStatus] = useState(options[0] ?? '');
   const [afterPhotoUrl, setAfterPhotoUrl] = useState('');
@@ -226,21 +226,24 @@ function StatusModal({ report, onClose, onUpdated }) {
       if (afterPhotoUrl) body.afterPhotoUrl = afterPhotoUrl;
       const { data } = await api.patch(`/supervisor/reports/${report.id}/status`, body);
       if (data.success) {
+        toast.success(`Report moved to ${STATUS_META[status]?.label ?? status}.`);
         onUpdated(data.data);
         onClose();
       } else {
         setError(data.message || 'Update failed.');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Update failed.');
+      const apiError = normalizeApiError(err, 'Update failed.');
+      setError(apiError.message);
+      toast.error(apiError);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="font-bold text-[#0d3b5c] text-lg">Update Status</h2>
@@ -340,6 +343,7 @@ function StatusModal({ report, onClose, onUpdated }) {
 // ─── Create Team Modal ────────────────────────────────────────────────────────
 
 function CreateTeamModal({ onClose, onCreated }) {
+  const toast = useToast();
   const [form, setForm] = useState({ name: '', specialization: '', municipality: '', latitude: '', longitude: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -357,13 +361,16 @@ function CreateTeamModal({ onClose, onCreated }) {
 
       const { data } = await api.post('/supervisor/teams', body);
       if (data.success) {
+        toast.success(`${data.data.name} added to the crew list.`);
         onCreated(data.data);
         onClose();
       } else {
         setError(data.message || 'Failed to create team.');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create team.');
+      const apiError = normalizeApiError(err, 'Failed to create team.');
+      setError(apiError.message);
+      toast.error(apiError);
     } finally {
       setSubmitting(false);
     }
@@ -372,8 +379,8 @@ function CreateTeamModal({ onClose, onCreated }) {
   const invalid = !form.name.trim() || !form.specialization;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h2 className="font-bold text-[#0d3b5c] text-lg">New Maintenance Crew</h2>
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
@@ -499,6 +506,7 @@ function TriageCard({ report, onSelect }) {
               <AlertTriangle size={11} /> Overdue
             </span>
           )}
+          <SlaBadge report={report} className="mb-1" />
           <p className={`text-xs ${urgent ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
             {timeAgo(report.createdAt)}
           </p>
@@ -526,6 +534,7 @@ function ActiveCard({ report, onSelect }) {
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">
           <StatusBadge status={report.status} />
+          <SlaBadge report={report} />
           <p className="text-xs text-slate-400">{timeAgo(report.assignedAt ?? report.createdAt)}</p>
         </div>
       </div>
@@ -581,6 +590,7 @@ export default function SupervisorDashboard() {
   const [loadingTriage, setLoadingTriage] = useState(true);
   const [loadingActive, setLoadingActive] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const [assignTarget, setAssignTarget] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
@@ -593,6 +603,15 @@ export default function SupervisorDashboard() {
       api.get('/supervisor/reports/active'),
       api.get('/supervisor/teams'),
     ]).then(([dashRes, triageRes, activeRes, teamsRes]) => {
+      const failures = [dashRes, triageRes, activeRes, teamsRes].filter(
+        (result) => result.status === 'rejected' || !result.value?.data?.success,
+      );
+      setLoadError(
+        failures.length > 0
+          ? 'Some dashboard sections could not load. Refresh to try again.'
+          : '',
+      );
+
       if (dashRes.status === 'fulfilled' && dashRes.value.data.success) {
         setStats(dashRes.value.data.data);
       }
@@ -647,7 +666,7 @@ export default function SupervisorDashboard() {
         // crude counter update
         if (updatedReport.status === 'IN_PROGRESS') { next.assigned = Math.max(0, s.assigned - 1); next.inProgress = s.inProgress + 1; }
         if (updatedReport.status === 'RESOLVED')    { next.inProgress = Math.max(0, s.inProgress - 1); next.resolved = s.resolved + 1; }
-        if (updatedReport.status === 'CLOSED')      { next.resolved = Math.max(0, s.resolved - 1); next.closed = s.closed + 1; }
+        if (updatedReport.status === 'CLOSED')      { next.resolved = Math.max(0, s.resolved - 1); next.closed = (s.closed ?? 0) + 1; }
         return next;
       });
     }
@@ -673,7 +692,7 @@ export default function SupervisorDashboard() {
       <main className="min-h-screen bg-slate-50">
         {/* Page header */}
         <div className="bg-[#0d3b5c] text-white px-4 sm:px-6 lg:px-8 py-6">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <Shield size={24} className="text-[#e8b923]" />
               <div>
@@ -692,6 +711,19 @@ export default function SupervisorDashboard() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          {loadError && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <span>{loadError}</span>
+              <button
+                type="button"
+                onClick={refresh}
+                className="font-semibold underline hover:text-amber-900"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {/* Stats bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {statCards.map(({ label, value, icon: Icon, color, bg }) => (

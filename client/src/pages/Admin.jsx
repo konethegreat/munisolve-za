@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Shield, Trash2 } from 'lucide-react';
 import api from '../api/axios';
+import { normalizeApiError } from '../api/errors';
+import { useToast } from '../context/ToastContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import WeatherBadge from '../components/WeatherBadge';
@@ -81,6 +83,7 @@ function normalize(str) {
 
 export default function Admin() {
   const { user } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('REPORTS'); // REPORTS | USERS
 
   const [reports, setReports] = useState([]);
@@ -110,7 +113,9 @@ export default function Admin() {
         setReportsError(data?.message || 'Failed to load reports.');
       }
     } catch (err) {
-      setReportsError(err.response?.data?.message || 'Failed to load reports. Please try again.');
+      setReportsError(
+        normalizeApiError(err, 'Failed to load reports. Please try again.').message,
+      );
     } finally {
       setReportsLoading(false);
     }
@@ -128,7 +133,9 @@ export default function Admin() {
         setUsersError(data?.message || 'Failed to load users.');
       }
     } catch (err) {
-      setUsersError(err.response?.data?.message || 'Failed to load users. Please try again.');
+      setUsersError(
+        normalizeApiError(err, 'Failed to load users. Please try again.').message,
+      );
     } finally {
       setUsersLoading(false);
     }
@@ -204,11 +211,14 @@ export default function Admin() {
       const { data } = await api.patch(`/admin/reports/${reportId}/status`, payload);
       if (data?.success && data?.data) {
         setReports((prev) => prev.map((r) => (r.id === reportId ? data.data : r)));
+        toast.success(`Report moved to ${newStatus.replace(/_/g, ' ').toLowerCase()}.`);
       } else {
         setReportsError(data?.message || 'Failed to update report status.');
       }
     } catch (err) {
-      setReportsError(err.response?.data?.message || 'Failed to update report status.');
+      const apiError = normalizeApiError(err, 'Failed to update report status.');
+      setReportsError(apiError.message);
+      toast.error(apiError);
     } finally {
       setReportUpdatingId(null);
     }
@@ -225,11 +235,14 @@ export default function Admin() {
       if (data?.success) {
         setReports((prev) => prev.filter((r) => r.id !== reportId));
         setReportsCount((c) => (typeof c === 'number' ? Math.max(0, c - 1) : c));
+        toast.success('Report deleted.');
       } else {
         setReportsError(data?.message || 'Failed to delete report.');
       }
     } catch (err) {
-      setReportsError(err.response?.data?.message || 'Failed to delete report.');
+      const apiError = normalizeApiError(err, 'Failed to delete report.');
+      setReportsError(apiError.message);
+      toast.error(apiError);
     } finally {
       setReportDeletingId(null);
     }

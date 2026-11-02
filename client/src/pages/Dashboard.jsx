@@ -1,11 +1,13 @@
 // ==========================================
 // DASHBOARD PAGE - FULLY FUNCTIONAL
 // ==========================================
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FileText, Clock, Wrench, CheckCircle2, Plus, LogOut, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
 import api from '../api/axios';
+import { normalizeApiError } from '../api/errors';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ReportCard from '../components/ReportCard';
@@ -18,31 +20,34 @@ import AnimatedCounter from '../components/AnimatedCounter';
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const toast = useToast();
 
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
 
-  // Fetch reports on mount
-  useEffect(() => {
-    fetchReports();
-  }, []);
-
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
+      setError('');
       const { data } = await api.get('/reports');
       if (data.success) {
         setReports(data.data);
       }
     } catch (err) {
-      setError('Failed to load reports. Please refresh.');
-      console.error('Failed to fetch reports:', err);
+      const apiError = normalizeApiError(err, 'Failed to load reports. Please refresh.');
+      setError(apiError.message);
+      toast.error(apiError);
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Fetch reports on mount
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   // Remove deleted report from state
   const handleDelete = (deletedId) => {

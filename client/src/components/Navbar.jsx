@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link, NavLink } from 'react-router-dom'
-import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LayoutDashboard, LogIn, UserPlus, Shield, HardHat } from 'lucide-react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Menu, X, Home, ClipboardList, MapPin, UserCircle, LayoutDashboard, LogIn, UserPlus, Shield, HardHat, LogOut } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 const NAV_LINKS = [
@@ -13,9 +13,16 @@ const NAV_LINKS = [
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, logout } = useAuth()
+  const navigate = useNavigate()
   const isAdmin = ['MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(user?.role)
   const isSupervisor = ['WORKER_SUPERVISOR', 'MUNICIPAL_ADMIN', 'SUPER_ADMIN'].includes(user?.role)
+
+  const handleLogout = async () => {
+    setOpen(false)
+    await logout()
+    navigate('/login')
+  }
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -42,7 +49,7 @@ export default function Navbar() {
           <Link to="/" className="flex items-center gap-2 font-bold text-lg tracking-tight group">
             <span className="text-[#e8b923] transition-transform group-hover:scale-105">MuniSolve</span>
             <span>ZA</span>
-            <span className="text-white/70 text-sm font-normal hidden sm:inline">— K-ONE IT SOLUTIONS</span>
+            <span className="text-white/70 text-sm font-normal hidden sm:inline">by K-ONE IT SOLUTIONS</span>
           </Link>
 
           {/* Desktop menu */}
@@ -79,20 +86,39 @@ export default function Navbar() {
                 Admin Panel
               </Link>
             )}
-            <Link
-              to="/login"
-              className="flex items-center gap-1.5 bg-white/10 hover:bg-[#e8b923] hover:text-[#0d3b5c] text-white rounded-md px-4 py-2 transition-colors"
-            >
-              <LogIn size={18} />
-              Login
-            </Link>
-            <Link
-              to="/register"
-              className="btn btn-accent px-4 py-2"
-            >
-              <UserPlus size={18} />
-              Register
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <span className="flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-sm text-white/90">
+                  <UserCircle size={18} />
+                  <span className="max-w-28 truncate">{user?.firstName || 'Account'}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center gap-1.5 rounded-md px-3 py-2 text-white/90 transition-colors hover:bg-white/10 hover:text-[#e8b923]"
+                >
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="flex items-center gap-1.5 bg-white/10 hover:bg-[#e8b923] hover:text-[#0d3b5c] text-white rounded-md px-4 py-2 transition-colors"
+                >
+                  <LogIn size={18} />
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="btn btn-accent px-4 py-2"
+                >
+                  <UserPlus size={18} />
+                  Register
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -162,22 +188,35 @@ export default function Navbar() {
                   Admin Panel
                 </Link>
               )}
-              <Link
-                to="/login"
-                className="flex items-center gap-2 px-4 py-3 text-white/90 hover:bg-white/10 rounded-md"
-                onClick={() => setOpen(false)}
-              >
-                <LogIn size={18} />
-                Login
-              </Link>
-              <Link
-                to="/register"
-                className="flex items-center gap-2 px-4 py-3 bg-[#1a5f3c] text-white rounded-md mx-2"
-                onClick={() => setOpen(false)}
-              >
-                <UserPlus size={18} />
-                Register
-              </Link>
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 rounded-md px-4 py-3 text-left text-white/90 hover:bg-white/10"
+                >
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="flex items-center gap-2 px-4 py-3 text-white/90 hover:bg-white/10 rounded-md"
+                    onClick={() => setOpen(false)}
+                  >
+                    <LogIn size={18} />
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="flex items-center gap-2 px-4 py-3 bg-[#1a5f3c] text-white rounded-md mx-2"
+                    onClick={() => setOpen(false)}
+                  >
+                    <UserPlus size={18} />
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

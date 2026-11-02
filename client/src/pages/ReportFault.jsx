@@ -4,30 +4,33 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
 import api from '../api/axios';
+import { normalizeApiError } from '../api/errors';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import MunicipalitySelector from '../components/MunicipalitySelector';
 import AirQualityBadge from '../components/AirQualityBadge';
 import HolidayBanner from '../components/HolidayBanner';
 
-const NOMINATIM_HEADERS = {
-  'User-Agent': 'MuniSolveZA/1.0 (erictshivhinda@gmail.com)',
-};
-
-async function nominatimSearch(query) {
+// The API proxies Nominatim with caching, rate limiting and the required identity header.
+async function searchPlaces(query) {
   if (!query || query.trim().length < 2) return [];
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&countrycodes=za&format=json&limit=5`;
-  const res = await fetch(url, { headers: NOMINATIM_HEADERS });
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    const { data } = await api.get('/geo/search', { params: { q: query.trim(), limit: 5 } });
+    return data.success && Array.isArray(data.data) ? data.data : [];
+  } catch {
+    return [];
+  }
 }
 
-async function nominatimReverse(lat, lon) {
-  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
-  const res = await fetch(url, { headers: NOMINATIM_HEADERS });
-  if (!res.ok) return null;
-  return res.json();
+async function reversePlace(lat, lon) {
+  try {
+    const { data } = await api.get('/geo/reverse', { params: { lat, lon } });
+    return data.success ? data.data : null;
+  } catch {
+    return null;
+  }
 }
 
 const CATEGORIES = [
@@ -58,6 +61,7 @@ const MUNICIPALITIES = [
 export default function ReportFault() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const toast = useToast();
   
   const [form, setForm] = useState({
     title: '',
@@ -69,7 +73,6 @@ export default function ReportFault() {
     longitude: null,
   });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [addressSuggestionsLoading, setAddressSuggestionsLoading] = useState(false);
@@ -98,7 +101,7 @@ export default function ReportFault() {
     const t = setTimeout(async () => {
       setAddressSuggestionsLoading(true);
       try {
-        const results = await nominatimSearch(form.address);
+        const results = await searchPlaces(form.address);
         setAddressSuggestions(Array.isArray(results) ? results : []);
       } catch {
         setAddressSuggestions([]);
@@ -153,7 +156,7 @@ export default function ReportFault() {
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
-          const data = await nominatimReverse(latitude, longitude);
+          const data = await reversePlace(latitude, longitude);
           if (data && data.display_name) {
             setForm((prev) => ({
               ...prev,
@@ -193,7 +196,6 @@ export default function ReportFault() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess(false);
     setLoading(true);
 
     // Validate coordinates are present
@@ -210,31 +212,21 @@ export default function ReportFault() {
         longitude: form.longitude ?? undefined,
       };
       const { data } = await api.post('/reports', payload);
-      
+
       if (data.success) {
-        setSuccess(true);
-        // Reset form
-        setForm({
-          title: '',
-          description: '',
-          category: '',
-          municipality: '',
-          address: '',
-          latitude: null,
-          longitude: null,
-        });
-        
-        // Redirect to dashboard after 2 seconds
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 2000);
+        if (data.data?.mergedInto) {
+          toast.success(
+            `Report merged into #${String(data.data.mergedInto.id).padStart(4, '0')}. Updates will appear on the main report.`,
+          );
+        } else {
+          toast.success('Report submitted. We will keep you posted.');
+        }
+        navigate(`/reports/${data.data.id}`);
       }
     } catch (err) {
-      const msg =
-        err.response?.data?.message ||
-        err.message ||
-        'Failed to submit report. Please try again.';
-      setError(msg);
+      const apiError = normalizeApiError(err, 'Failed to submit report. Please try again.');
+      setError(apiError.message);
+      toast.error(apiError);
     } finally {
       setLoading(false);
     }
@@ -286,13 +278,6 @@ export default function ReportFault() {
             <div className="mb-6">
               <HolidayBanner />
             </div>
-
-            {success && (
-              <div className="mb-6 bg-green-50 border border-green-200 rounded-md px-4 py-3">
-                <p className="text-green-800 font-medium">✓ Report submitted successfully!</p>
-                <p className="text-green-700 text-sm">Redirecting to dashboard...</p>
-              </div>
-            )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
@@ -389,6 +374,9 @@ export default function ReportFault() {
                         </button>
                       </li>
                     ))}
+                    <li className="bg-slate-50 px-3 py-1.5 text-[11px] text-slate-400">
+                      Search by OpenStreetMap contributors
+                    </li>
                   </ul>
                 )}
                 <button
