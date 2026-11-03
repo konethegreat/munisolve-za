@@ -1,23 +1,37 @@
 // ==========================================
 // APP.JSX (Updated with Auth & Protected Routes)
 // ==========================================
+import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import SupervisorRoute from './components/SupervisorRoute';
-import ReportDetail from './pages/ReportDetail';
 
-// Pages
+// The landing page is the entry point, so it stays in the initial bundle.
 import LandingPage from './pages/LandingPage';
-import About from './pages/About';
-import Register from './pages/Register';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import ReportFault from './pages/ReportFault';
-import MapPage from './pages/MapPage';
-import Admin from './pages/Admin';
-import SupervisorDashboard from './pages/SupervisorDashboard';
-import VerifyEmail from './pages/VerifyEmail';
+
+// Every other route loads on demand; the map stack is the heaviest dependency.
+const About = lazy(() => import('./pages/About'));
+const Register = lazy(() => import('./pages/Register'));
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ReportFault = lazy(() => import('./pages/ReportFault'));
+const MapPage = lazy(() => import('./pages/MapPage'));
+const Admin = lazy(() => import('./pages/Admin'));
+const SupervisorDashboard = lazy(() => import('./pages/SupervisorDashboard'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const ReportDetail = lazy(() => import('./pages/ReportDetail'));
+
+function PageFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50" role="status" aria-live="polite">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0d3b5c] mx-auto mb-4" aria-hidden="true"></div>
+        <p className="text-slate-600">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   return (
@@ -27,7 +41,8 @@ function App() {
           Local demo · fictional data · no real municipal submissions
         </div>
       )}
-      <Routes>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/about" element={<About />} />
@@ -77,7 +92,8 @@ function App() {
             </SupervisorRoute>
           }
         />
-      </Routes>
+        </Routes>
+      </Suspense>
     </>
   );
 }
