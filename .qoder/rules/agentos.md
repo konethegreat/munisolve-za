@@ -25,15 +25,16 @@ These laws apply to every agent (Hermes, Claude Code, Qoder, Antigravity) in eve
 - No bloated abstractions or speculative generality. No dependency unless it removes more complexity than it adds.
 - Before committing, scan your diff for U+2014, U+2013 and placeholder markers and fix any hits.
 
-### Law 3 - Autonomous PR and merge loop
+### Law 3 - Pull requests, one merge policy
 For every task:
 1. `git checkout main && git pull` then create a clean branch: `git checkout -b <type>/<short-slug>` (type = feat, fix, chore, docs, refactor).
 2. Commit atomic changes with conventional commit messages.
 3. `git push -u origin HEAD` and open a PR with `gh pr create --fill` (or an explicit `--title`/`--body` that lists changes, assumptions, and verification).
 4. Review your own diff immediately (`gh pr diff`): security (secrets, injection, unsafe input handling, permissions), logic (edge cases, error paths), and build (run the build, linters, and tests locally).
 5. Fix anything you find, push again, and repeat the review.
-6. If builds and tests pass, merge it yourself: `gh pr merge --squash --delete-branch` (use `--auto` when required checks are still running), then `git checkout main && git pull`.
-7. If the repo has no remote or `gh` is not authenticated, commit on a branch, merge locally into main with `git merge --squash`, and note it in the task summary.
+6. Agents open pull requests; AgentOS Studio merges them. When the task is an AgentOS Studio mission (its brief names a Mission, a Worktree or a Repository), never merge it yourself: put the PR URL in your `complete_task` summary and stop. Studio runs the constitution gate, has a different agent review the PR, and squash merges it when the review approves, CI is green and the repository's autonomy level allows it.
+7. Outside a mission, merge only when the owner directs that session to, and only after builds and tests pass: `gh pr merge --squash --delete-branch` (use `--auto` when required checks are still running), then `git checkout main && git pull`. Otherwise leave the PR open for Studio or the owner.
+8. If the repo has no remote or `gh` is not authenticated, commit on a branch, merge locally into main with `git merge --squash` only under the same rule as step 7, and note it in the task summary.
 
 ### Law 4 - Performance-first language selection
 - Pick the fastest, lowest-overhead language that fits the task.
