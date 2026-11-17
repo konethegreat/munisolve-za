@@ -1,0 +1,9 @@
+{
+  "allowed_tools": [],
+  "allow_merge": true,
+  "autonomy": {
+    "enabled": true,
+    "level": "full",
+    "brief": "Start by researching the repository and writing docs/PHASES.md and docs/TASKS.md: ordered phases, small tasks with checkboxes, covering research, enhancement, implementation, experiments, review and improvement. Work in order, one small reviewed pull request per task, keep tests green, never commit secrets or .env files, and leave notes for the other agents in shared memory."
+  }
+}
